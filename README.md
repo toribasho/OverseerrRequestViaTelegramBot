@@ -1,6 +1,13 @@
 # OverseerrRequestViaTelegramBot
 A phyton script to request movies and series via a Telegram bot via Overseerr
 
+## How to use
+1. Open a chat with your Telegram bot
+2. /request MOVIE / TV-Show
+
+![grafik](https://github.com/user-attachments/assets/e709d8ab-20f1-4c39-8fe8-516ad2962d3d)
+
+
 ## Preparation:
 
 ### Create a Telegram Bot
@@ -160,6 +167,33 @@ def main() -> None:
 if __name__ == '__main__':
     main()
 ```
+#Add script as service
+To start the script automatically, we create a service
 
-# Know Issues
-1.
+```
+sudo nano /etc/systemd/system/telegram_bot.service
+```
+
+```
+[Unit]
+Description=Overseerr Telegram Bot
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /path/to/your/script.py
+WorkingDirectory=/path/to/your/script-directory
+Restart=always
+User=your-username
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable telegram_bot.service
+sudo systemctl start telegram_bot.service
+sudo systemctl status telegram_bot.service
+```
