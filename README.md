@@ -56,7 +56,7 @@ logging.basicConfig(
 )
 
 # Constants for the API
-OVERSEERR_API_URL = 'http://your_overseerr_url/api/v1'  # Replace with your Overseerr API URL
+OVERSEERR_API_URL = 'http://your_overseerr_url/api/v1'  # Replace with your Overseerr API URL e.g. 'http://172.1.1.100:5055/api/v1'
 CONNECT_SID = 'your_connect_sid_value'  # Replace with your connect.sid value
 TELEGRAM_TOKEN = 'your_telegram_bot_token'  # Replace with your Telegram bot token
 
