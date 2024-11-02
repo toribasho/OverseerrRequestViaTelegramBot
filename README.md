@@ -167,7 +167,7 @@ def main() -> None:
 if __name__ == '__main__':
     main()
 ```
-#Add script as service
+## Add script as service
 To start the script automatically, we create a service
 
 ```
