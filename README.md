@@ -14,7 +14,8 @@ After you have created the bot, the bot token will be displayed. Write it down, 
 
 ### get overseerr API_KEY
 
-![image](https://github.com/user-attachments/assets/2f152494-39db-4b5f-a98a-2edfa3383f4c)
+![image](https://github.com/user-attachments/assets/b612cfc3-baa9-49ad-96e2-4de8f9ebecde)
+
 
 
 ### Linux / Ubuntu:
