@@ -9,6 +9,10 @@ https://core.telegram.org/bots#how-do-i-create-a-bot
 
 After you have created the bot, the bot token will be displayed. Write it down, we will need it later.
 
+### connect.sid-Cookie
+
+
+
 
 ### Linux / Ubuntu:
 
