@@ -9,8 +9,19 @@ https://core.telegram.org/bots#how-do-i-create-a-bot
 
 After you have created the bot, the bot token will be displayed. Write it down, we will need it later.
 
+![image](https://github.com/user-attachments/assets/1a034159-2ba2-4573-948e-b4c643b87fa7)
+
+
 ### connect.sid-Cookie
 
+The Overseerr API requires authentication through the connect.sid cookie.
+
+1. log in to Overseerr on the computer where you run the script
+2. open the developer tools (right click -> Explore or F12)
+3. go to the tab “Application” or “Storage” and search for cookies
+4. copy the value of the connect.sid cookie.
+
+![connect sid cookie](https://github.com/user-attachments/assets/5b2a641a-7b2e-4b60-aa8e-64f36969e7b2)
 
 
 
@@ -59,6 +70,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# REPLACE PLACEHOLDER HERE
 # Constants for the API
 OVERSEERR_API_URL = 'http://your_overseerr_url/api/v1'  # Replace with your Overseerr API URL e.g. 'http://172.1.1.100:5055/api/v1'
 CONNECT_SID = 'your_connect_sid_value'  # Replace with your connect.sid value
