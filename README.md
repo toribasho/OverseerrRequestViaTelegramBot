@@ -9,7 +9,7 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 
 ## To-Do List
 - [x] Request movie / tv-show
-- [ ] Show instructions for the bot when you start it for the first time or at “/start”
+- [x] Show instructions for the bot when you start it for the first time or at “/start”
 - [ ] Notify user when media has been added
 
 ## Installation
@@ -163,9 +163,24 @@ async def request_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         error_message = request_response.json().get('message', 'Unknown error')
         await update.message.reply_text(f"Error during the request: {error_message}")
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    start_message = (
+        "Welcome to the Overseerr Telegram Bot! Here's how you can use me:\n\n"
+        "🔍 *To search and request a movie or TV show:*\n"
+        "Type `/request <title>`.\n"
+        "_Example: /request Venom_\n\n"
+        "🎬 *What I do:*\n"
+        "- I’ll search for the title you specify.\n"
+        "- If it’s found, I’ll check if a request already exists.\n"
+        "- If it hasn’t been requested, I’ll submit a request for you and update you on the status.\n\n"
+        "Try it out and let me handle your Overseerr requests easily! 😊"
+    )
+    await update.message.reply_text(start_message, parse_mode='Markdown')
+
 def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("request", request_media))
+app.add_handler(CommandHandler("start", start_command))  # /start command handler
+    app.add_handler(CommandHandler("request", request_media)) # /request command handler
     app.run_polling()
 
 if __name__ == '__main__':
