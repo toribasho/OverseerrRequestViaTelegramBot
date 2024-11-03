@@ -12,6 +12,7 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 ## To-Do List
 - [x] Request movie / tv-show
 - [x] Show instructions for the bot when you start it for the first time or at “/start”
+- [ ] Selection option if several suitable results exist
 - [ ] Notify user when media has been added
 
 ## Installation
