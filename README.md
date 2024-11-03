@@ -3,7 +3,8 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 
 ## How to use
 1. Open a chat with your Telegram bot
-2. /request MOVIE / TV-Show
+2. /start
+3. /request MOVIE / TV-Show
 
 ![grafik](https://github.com/user-attachments/assets/fa3a6ae1-4ffd-4fbe-833e-2061a87d2893)
 
