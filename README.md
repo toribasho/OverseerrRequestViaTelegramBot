@@ -202,6 +202,8 @@ Description=Overseerr Telegram Bot
 After=network.target
 
 [Service]
+Type=simple
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/python3 /path/to/your/script.py
 WorkingDirectory=/path/to/your/script-directory
 Restart=always
