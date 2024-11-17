@@ -17,6 +17,13 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 - [x] Selection option if several suitable results exist (v2.0)
 - [ ] Notify user when media has been added
 
+
+## How to update?
+```bash
+cd OverseerrRequestViaTelegramBot
+git pull
+```
+
 ## Installation
 
 ### Create a Telegram Bot
@@ -36,10 +43,11 @@ After you have created the bot, the bot token will be displayed. Write it down, 
 
 ### Linux / Ubuntu:
 
-Install Python 3.12.x or newer
+Install Python 3.12.x or newer & git
 
 ```bash
 sudo apt install python3
+sudo apt install git
 ```
 
 Install pip & libraries to interact with the Telegram API and the Overseerr API
@@ -49,11 +57,10 @@ sudo apt install python3-pip
 pip install python-telegram-bot requests
 ```
 
-### Download & unzip the script
+### Download
 ```bash
-wget https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/releases/download/telebot2.0/TelegramOverseerrBot.zip
-unzip TelegramOverseerrBot.zip
-cd TelegramOverseerrBot
+git clone https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot.git
+cd OverseerrRequestViaTelegramBot
 ```
 
 > [!IMPORTANT]
