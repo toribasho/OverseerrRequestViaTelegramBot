@@ -91,8 +91,8 @@ After=network.target
 [Service]
 Type=simple
 ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/python3 /path/to/your/script.py
-WorkingDirectory=/path/to/your/script-directory
+ExecStart=/usr/bin/python3 /path/to/your/script.py   #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot/telegram_overseerr_bot.py
+WorkingDirectory=/path/to/your/script-directory      #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot
 Restart=always
 User=your-username
 Environment=PYTHONUNBUFFERED=1
