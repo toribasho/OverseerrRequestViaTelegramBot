@@ -18,7 +18,7 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 - [ ] Notify user when media has been added
 
 
-## How to update?
+## How to update
 ```bash
 cd OverseerrRequestViaTelegramBot
 git pull
