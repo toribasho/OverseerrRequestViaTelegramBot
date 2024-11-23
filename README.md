@@ -11,9 +11,8 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 ![2 1 - 1](https://github.com/user-attachments/assets/948de1d0-9fd6-494d-b1c7-44a7a8c10cda)
 ![2 1 - 2](https://github.com/user-attachments/assets/73c45385-5221-4930-93ce-721e1516768d)
 ![2 1 - 4](https://github.com/user-attachments/assets/4cae88f0-708f-4149-8ae9-8f67d70a3c02)
-![2 1 - 3](https://github.com/user-attachments/assets/e7d1fc30-84a7-448a-a809-b670e053bb4d)
-![2 1 - 5](https://github.com/user-attachments/assets/f2c1f4d7-06ae-46bb-82fb-3ad882c34547)
-
+![2 1 - 3](https://github.com/user-attachments/assets/7824f4b9-a07d-48ed-8b07-d266366a7076)
+![2 1 - 5](https://github.com/user-attachments/assets/94094b0a-8af5-4837-b0b2-ab9a02f076cb)
 
 
 ## How to update
