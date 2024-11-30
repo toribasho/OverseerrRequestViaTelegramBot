@@ -8,11 +8,15 @@ A phyton script to request movies and series via a Telegram bot via Overseerr
 
 ℹ️Note: The language of the media titles and descriptions will match the language setting configured in Overseerr.
 
-![2 1 - 1](https://github.com/user-attachments/assets/948de1d0-9fd6-494d-b1c7-44a7a8c10cda)
-![2 1 - 2](https://github.com/user-attachments/assets/73c45385-5221-4930-93ce-721e1516768d)
-![2 1 - 4](https://github.com/user-attachments/assets/4cae88f0-708f-4149-8ae9-8f67d70a3c02)
-![2 1 - 3](https://github.com/user-attachments/assets/7824f4b9-a07d-48ed-8b07-d266366a7076)
-![2 1 - 5](https://github.com/user-attachments/assets/94094b0a-8af5-4837-b0b2-ab9a02f076cb)
+![2 1 - 1](https://github.com/user-attachments/assets/34a3c907-bdf9-4e4e-bb31-020f06d3c706)
+
+![2 1 - 2](https://github.com/user-attachments/assets/edb2c57a-6983-4b9a-8ed5-e9acacf3e143)
+![2 1 - 6](https://github.com/user-attachments/assets/26f41f63-0a9d-4845-b0b2-61ffcba799bb)
+
+![2 1 - 3](https://github.com/user-attachments/assets/4059e277-c608-44df-8c79-71df1ccb3b0f)
+![2 1 - 4](https://github.com/user-attachments/assets/000d286f-b0ac-4ebe-b6bb-9b66fa619da8)
+
+
 
 
 ## How to update
