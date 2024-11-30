@@ -1,12 +1,28 @@
-# OverseerrRequestViaTelegramBot
-A phyton script to request movies and series via a Telegram bot via Overseerr
+# Overseerr Telegram Bot
+A phyton script to request media via a Telegram bot via Overseerr
+
+The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, enabling you to request movies and TV shows directly within Telegram.
+
+### 🌟 Features
+
+- **🔍 Simple Search** - Quickly search for series and movies
+
+- **📥 Easy Requests** - Submit media requests with just a few taps.
+
+- **🛠 Issue Reporting** - Report any issues or problems
+
+- **📊 Status Tracking** - View the status of requests to see if media has been requested, is available, or is being processed.
+
+- **👌 User-Friendly** - Intuitive and easy to use, ensuring a seamless media management experience.
+
 
 ## How to use
 1. Open a chat with your Telegram bot
 2. /start
 3. /check MOVIE / TV-Show
 
-ℹ️Note: The language of the media titles and descriptions will match the language setting configured in Overseerr.
+> [!Note]
+> The language of the media titles and descriptions will match the language setting configured in Overseerr.
 
 ![2 1 - 1](https://github.com/user-attachments/assets/34a3c907-bdf9-4e4e-bb31-020f06d3c706)
 
