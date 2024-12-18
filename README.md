@@ -6,14 +6,11 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 ### 🌟 Features
 
 - **🔍 Simple Search** - Quickly search for series and movies
-
 - **📥 Easy Requests** - Submit media requests with just a few taps.
-
 - **🛠 Issue Reporting** - Report any issues or problems
-
 - **📊 Status Tracking** - View the status of requests to see if media has been requested, is available, or is being processed.
-
 - **👌 User-Friendly** - Intuitive and easy to use, ensuring a seamless media management experience.
+- **🔒 Access Control** - Optional password protection to restrict access to the bot.
 
 
 ## How to use
@@ -24,7 +21,8 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 > [!Note]
 > The language of the media titles and descriptions will match the language setting configured in Overseerr.
 
-![2 1 - 1](https://github.com/user-attachments/assets/34a3c907-bdf9-4e4e-bb31-020f06d3c706)
+
+![2 3 - 1](https://github.com/user-attachments/assets/a2191778-0b33-4de7-841d-7f7b4c53bf4d)
 
 ![2 1 - 2](https://github.com/user-attachments/assets/edb2c57a-6983-4b9a-8ed5-e9acacf3e143)
 ![2 1 - 6](https://github.com/user-attachments/assets/26f41f63-0a9d-4845-b0b2-61ffcba799bb)
@@ -45,14 +43,13 @@ git pull
 
 ### Create a Telegram Bot
 
-https://core.telegram.org/bots#how-do-i-create-a-bot
-
-After you have created the bot, the bot token will be displayed. Write it down, we will need it later.
+Follow the instructions at [Telegram Bots: How do I create a bot?](https://core.telegram.org/bots#how-do-i-create-a-bot) to create a new Telegram bot. After creating the bot, you'll receive a bot token. Keep this token secure, as it will be needed later.
 
 ![image](https://github.com/user-attachments/assets/1a034159-2ba2-4573-948e-b4c643b87fa7)
 
 
 ### get overseerr API_KEY
+Obtain your Overseerr API key from your Overseerr instance settings.
 
 ![image](https://github.com/user-attachments/assets/b612cfc3-baa9-49ad-96e2-4de8f9ebecde)
 
@@ -63,14 +60,13 @@ After you have created the bot, the bot token will be displayed. Write it down, 
 Install Python 3.12.x or newer & git
 
 ```bash
-sudo apt install python3
-sudo apt install git
+sudo apt update
+sudo apt install python3 python3-pip git
 ```
 
-Install pip & libraries to interact with the Telegram API and the Overseerr API
+Install required Python libraries:
 
 ```bash
-sudo apt install python3-pip
 pip install python-telegram-bot requests
 ```
 
@@ -87,10 +83,17 @@ mv config_template.py config.py
 nano config.py
 ```
 ``` python
-# Configuration file
+# config.py
+
 OVERSEERR_API_URL = 'http://YOUR_IP_ADDRESS:5055/api/v1'
 OVERSEERR_API_KEY = 'YOUR_OVERSEERR_API_KEY'
 TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'
+
+# Access Control Configuration (Optional)
+# Set a password to protect access. If empty, no access control is applied.
+PASSWORD = "your-secure-password"  # or "" for no access control
+
+WHITELIST = []  # Once a user enters the correct password, they will be added here automatically.
 ```
 
 ## Add script as service
