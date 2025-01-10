@@ -93,6 +93,8 @@ TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'
 # Access Control Configuration (Optional)
 # Set a password to protect access. If empty, no access control is applied.
 PASSWORD = "your-secure-password"  # or "" for no access control
+
+WHITELIST = []  # Please use the new whitelist.json in the data folder. 
 ```
 
 ### Add script as service
