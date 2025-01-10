@@ -2,6 +2,8 @@ import logging
 import requests
 import urllib.parse
 import ast
+import json
+import os
 
 from telegram import (
     Update,
@@ -18,20 +20,26 @@ from telegram.ext import (
     filters,
 )
 
-# Attempt to import all variables from config.py, including PASSWORD and WHITELIST.
-# If PASSWORD and WHITELIST are not defined (older config version), an ImportError will occur.
-try:
-    from config import OVERSEERR_API_URL, OVERSEERR_API_KEY, TELEGRAM_TOKEN, PASSWORD, WHITELIST
-except ImportError:
-    # If the user is using an older config.py without PASSWORD and WHITELIST,
-    # we define them here with default values. This ensures backward compatibility
-    # and prevents the bot from crashing when these variables are missing.
-    from config import OVERSEERR_API_URL, OVERSEERR_API_KEY, TELEGRAM_TOKEN
-    PASSWORD = ""     # No password set by default
-    WHITELIST = []     # Empty whitelist by default
+VERSION = "2.4.0"
+BUILD = "2025.01.09.107"  # Incremented build number
 
-VERSION = "2.3.0"
-BUILD = "2024.12.18.101"  # Incremented build number
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Bot Version: {VERSION} BUILD: {BUILD}")
+
+# Configuration via environment variables OR config.py
+try:
+    logger.info(f"Importing Variables...")
+    OVERSEERR_API_URL = os.environ.get("OVERSEERR_API_URL") or getattr(__import__("config"), "OVERSEERR_API_URL", None)
+    OVERSEERR_API_KEY = os.environ.get("OVERSEERR_API_KEY") or getattr(__import__("config"), "OVERSEERR_API_KEY", None)
+    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") or getattr(__import__("config"), "TELEGRAM_TOKEN", None)
+    PASSWORD = os.environ.get("PASSWORD") or getattr(__import__("config"), "PASSWORD", "")
+    logger.info(f"Variables loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load: {e}")
 
 # Status codes
 STATUS_UNKNOWN = 1
@@ -47,13 +55,59 @@ ISSUE_TYPES = {
     4: "Other"
 }
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
+WHITELIST_FILE = "data/whitelist.json"
+os.makedirs("data", exist_ok=True) # Stelle sicher, dass der Ordner existiert
 
-in_memory_whitelist = set(WHITELIST)
+def load_whitelist():
+    """Loads the whitelist from JSON or migrates from config.py if necessary."""
+    try:
+        with open(WHITELIST_FILE, "r", encoding="utf-8") as f:
+            return set(json.load(f))
+    except (FileNotFoundError, json.JSONDecodeError):
+        logging.warning("Whitelist file not found or invalid. Trying to migrate from config.py...")
+        try:
+            from config import WHITELIST
+            if WHITELIST and isinstance(WHITELIST, list):
+                whitelist_set = set(WHITELIST)
+                save_whitelist(whitelist_set)
+                logging.info("Whitelist migrated from config.py. Clearing config.py entry")
+                clear_whitelist_in_config()
+                return whitelist_set
+            else:
+                logging.warning("No valid whitelist found in config.py. Creating new file.")
+                save_whitelist(set())
+                return set()
+        except (ImportError, AttributeError):
+            logging.warning("config.py or WHITELIST not found. Creating new whitelist file.")
+            save_whitelist(set())
+            return set()
+
+def save_whitelist(whitelist):
+    """Saves the whitelist to the JSON file."""
+    with open(WHITELIST_FILE, "w", encoding="utf-8") as f:
+        json.dump(list(whitelist), f, indent=4)
+
+def clear_whitelist_in_config():
+    """Clears the WHITELIST entry in config.py."""
+    config_file_path = "config.py"
+    try:
+        with open(config_file_path, "r+", encoding="utf-8") as f:
+            lines = f.readlines()
+            f.seek(0)
+            f.truncate()
+            for line in lines:
+                if line.strip().startswith("WHITELIST"):
+                    f.write("WHITELIST = []\n")
+                else:
+                    f.write(line)
+        logging.info("WHITELIST in config.py cleared.")
+    except FileNotFoundError:
+        logging.info("config.py not found, nothing to clear.")
+        return
+    except Exception as e:
+        logging.error(f"Failed to clear WHITELIST in config.py: {e}")
+
+in_memory_whitelist = load_whitelist()
 
 def user_is_authorized(user_id: int) -> bool:
     if not PASSWORD:
@@ -72,43 +126,10 @@ def check_password(user_input: str) -> bool:
     return user_input.strip() == PASSWORD.strip()
 
 def update_whitelist_in_config(new_user_id: int):
-    """
-    Updates the WHITELIST in config.py by adding the new user_id if it's not already present.
-    This approach reads the file line-by-line, finds the WHITELIST line, parses it, updates it, and rewrites it.
-    Assumes WHITELIST is defined in a single line in config.py.
-    """
-    config_file_path = "config.py"
-    try:
-        with open(config_file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        whitelist_line_index = None
-        for i, line in enumerate(lines):
-            if line.strip().startswith("WHITELIST"):
-                whitelist_line_index = i
-                break
-
-        if whitelist_line_index is not None:
-            # Parse the current WHITELIST line
-            # We expect something like WHITELIST = [123456, ...]
-            line = lines[whitelist_line_index]
-            # Split on '=', take the right side
-            right_side = line.split("=", 1)[1].strip()
-            # Safely evaluate the Python list
-            current_whitelist = ast.literal_eval(right_side)
-
-            if new_user_id not in current_whitelist:
-                current_whitelist.append(new_user_id)
-                # Rewrite the line
-                new_line = f"WHITELIST = {current_whitelist}\n"
-                lines[whitelist_line_index] = new_line
-
-                # Write back the file
-                with open(config_file_path, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
-                logger.info(f"Successfully updated WHITELIST in config.py with user_id {new_user_id}")
-    except Exception as e:
-        logger.error(f"Failed to update WHITELIST in config.py: {e}")
+    if new_user_id not in in_memory_whitelist:
+        in_memory_whitelist.add(new_user_id)
+        save_whitelist(in_memory_whitelist)
+        logger.info(f"Whitelist updated: {new_user_id}")
 
 def search_media(media_name: str):
     try:
@@ -179,7 +200,7 @@ def get_latest_version_from_github():
         logger.warning(f"Failed to check latest version: {e}")
         return ""
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):    
     user_id = update.effective_user.id
     if PASSWORD and not user_is_authorized(user_id):
         await request_password(update, context)
@@ -640,17 +661,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'awaiting_password' in context.user_data and context.user_data['awaiting_password']:
         user_input = update.message.text
         if check_password(user_input):
+            logging.info(f"Whitelist before adding: {in_memory_whitelist}")  # Debug logging
             in_memory_whitelist.add(user_id)
+            logging.info(f"Whitelist after adding: {in_memory_whitelist}")   # Debug logging
+            save_whitelist(in_memory_whitelist)  # Save whitelist immediately!
+            logging.info(f"Whitelist saved to file.")                       # Debug logging
             context.user_data['awaiting_password'] = False
-            await update.message.reply_text("✅ Password correct! You are now authorized to use the bot.")            
-            # Now call the start_command function to display the start_message
-            await start_command(update, context)            
-            # Update the config.py whitelist
-            update_whitelist_in_config(user_id)
+            await update.message.reply_text("✅ Password correct! You are now authorized to use the bot.")
+            await start_command(update, context) #Call Startcommand to show the available commands
+            update_whitelist_in_config(user_id) #Update Whitelist if there is a config.py
         else:
-            await update.message.reply_text(
-                "❌ Wrong password. Please try again."
-            )
+            await update.message.reply_text("❌ Wrong password. Please try again.")
         return
 
     if 'reporting_issue' in context.user_data:
@@ -702,7 +723,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "I didn't understand that. Please use /start to see the available commands."
         )
 
-def main():
+def main():    
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("check", check_media))

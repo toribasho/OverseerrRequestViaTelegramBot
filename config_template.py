@@ -8,7 +8,6 @@ TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'
 # Set a password to protect access. If empty, no access control is applied.
 PASSWORD = ""  # or "" for no access control
 
-# Initial whitelist of user IDs that do not need to enter the password.
-# You can leave this empty (as an empty list) if no user is pre-authorized.
-# Once a user enters the correct password, they will be added here dynamically.
+# Please use the new whitelist.json in the data folder. 
+# This variable is only included for compatibility with old versions.
 WHITELIST = []  # Telegram User IDs
