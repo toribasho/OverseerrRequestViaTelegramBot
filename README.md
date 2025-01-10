@@ -31,7 +31,7 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 ![2 1 - 4](https://github.com/user-attachments/assets/000d286f-b0ac-4ebe-b6bb-9b66fa619da8)
 
 
-## How to update
+## Update on Ubuntu / Linux
 ```bash
 cd OverseerrRequestViaTelegramBot
 git pull
