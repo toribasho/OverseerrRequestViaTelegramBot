@@ -31,8 +31,6 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 ![2 1 - 4](https://github.com/user-attachments/assets/000d286f-b0ac-4ebe-b6bb-9b66fa619da8)
 
 
-
-
 ## How to update
 ```bash
 cd OverseerrRequestViaTelegramBot
@@ -55,7 +53,10 @@ Obtain your Overseerr API key from your Overseerr instance settings.
 
 
 
-### Linux / Ubuntu:
+### Installation on Ubuntu / Linux (without Docker)
+
+> [!Note]
+> If you prefer to install using Docker, please refer to the section [Installation with Docker](#installation-with-docker).  
 
 Install Python 3.12.x or newer & git
 
@@ -92,11 +93,9 @@ TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'
 # Access Control Configuration (Optional)
 # Set a password to protect access. If empty, no access control is applied.
 PASSWORD = "your-secure-password"  # or "" for no access control
-
-WHITELIST = []  # Once a user enters the correct password, they will be added here automatically.
 ```
 
-## Add script as service
+### Add script as service
 To start the script automatically, we create a service
 
 ```
@@ -128,3 +127,49 @@ sudo systemctl enable telegram_bot.service
 sudo systemctl start telegram_bot.service
 sudo systemctl status telegram_bot.service
 ```
+
+## Installation with Docker
+
+Our [Docker Hub](https://hub.docker.com/repository/docker/chimpanzeesweetrolls/overseerrrequestviatelegrambot/general)
+
+### docker-compose.yml
+```
+version: "3.9" # Specifies the version of the Docker Compose file format
+services:
+  telegram-bot: # The name of the service (container)
+	image: chimpanzeesweetrolls/overseerrrequestviatelegrambot:2.4.0 # you can also use :latest
+	environment:
+	  OVERSEERR_API_URL: "http://your-overseerr-ip:5055/api/v1"
+	  OVERSEERR_API_KEY: "your_overseerr_api_key"
+	  TELEGRAM_TOKEN: "your_telegram_token"
+	  PASSWORD: "your_password" # or "" for no access control
+	volumes:
+	  - ./data:/app/data
+	restart: unless-stopped
+```
+
+### Without compose:
+```
+docker run -d \
+    --name telegram-bot \
+    -v $(pwd)/data:/app/data \ 
+    -e OVERSEERR_API_URL="http://your-overseerr-ip:5055/api/v1" \ 
+    -e OVERSEERR_API_KEY="your_overseerr_api_key" \ 
+    -e TELEGRAM_TOKEN="your_telegram_token" \ 
+    -e PASSWORD="your_password" \
+    chimpanzeesweetrolls/overseerrrequestviatelegrambot:2.4.0 # you can also use :latest
+```
+
+### NAS GUI (QNAP as an example, other manufacturers should be similar)
+
+![1](https://github.com/user-attachments/assets/2fa3d40f-5be4-45b7-b61c-b3b8645340a4)
+![2](https://github.com/user-attachments/assets/79601018-ed27-41b9-87e1-69a5b9cd0f1b)
+![3](https://github.com/user-attachments/assets/9528cec9-a2e8-4e44-a710-39e002fa084b)
+![4](https://github.com/user-attachments/assets/88979017-e7a0-4877-b288-6044e52e2352)
+![5](https://github.com/user-attachments/assets/612827f4-50c1-4ac8-8819-a083906eaa82)
+![6](https://github.com/user-attachments/assets/35330e3d-a9a6-484a-9fda-3edb36aa59d9)
+![7](https://github.com/user-attachments/assets/a35b5b52-b1ef-48dd-973d-3292c348a0ca)
+![8](https://github.com/user-attachments/assets/b9d5a621-28f4-43d5-b78c-73178fe883fe)
+![9](https://github.com/user-attachments/assets/dd2c98bc-7028-49b5-aa19-33e0d8c13939)
+
+
