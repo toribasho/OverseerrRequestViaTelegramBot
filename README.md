@@ -58,77 +58,121 @@ Obtain your Overseerr API key from your Overseerr instance settings.
 > [!Note]
 > If you prefer to install using Docker, please refer to the section [Installation with Docker](#installation-with-docker).  
 
-Install Python 3.12.x or newer & git
+---
+
+## 1. Prerequisites
+
+Ensure the following are installed on your system:
+
+- **Python 3.12.x** or newer  
+- **pip** (Python's package manager)  
+- **git** (for cloning the repository)
+
+Install them using the following commands:
 
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip git
 ```
 
-Install required Python libraries:
+---
 
-```bash
-pip install python-telegram-bot requests
-```
+## 2. Download and Set Up the Bot
 
-### Download
-```bash
-git clone https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot.git
-cd OverseerrRequestViaTelegramBot
-```
+1. Clone the repository and navigate to the bot's directory:
 
-> [!IMPORTANT]
-> Rename config file and replace each placeholder with your actual values
+    ```bash
+    git clone https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot.git
+    cd OverseerrRequestViaTelegramBot
+    ```
+
+2. Ensure you have all required Python dependencies installed. They are listed in `requirements.txt`. Install them using:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+---
+
+## 3. Configure the Bot
+
+Rename the configuration template and update it with your actual values:
+
 ```bash
 mv config_template.py config.py
 nano config.py
 ```
+
+
 ``` python
 # config.py
 
-OVERSEERR_API_URL = 'http://YOUR_IP_ADDRESS:5055/api/v1'
-OVERSEERR_API_KEY = 'YOUR_OVERSEERR_API_KEY'
-TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'
+OVERSEERR_API_URL = 'http://YOUR_IP_ADDRESS:5055/api/v1' # Replace with your Overseerr URL
+OVERSEERR_API_KEY = 'YOUR_OVERSEERR_API_KEY'             # Replace with your API key
+TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'                   # Replace with your Telegram bot token
 
 # Access Control Configuration (Optional)
 # Set a password to protect access. If empty, no access control is applied.
 PASSWORD = "your-secure-password"  # or "" for no access control
-
-WHITELIST = []  # Please use the new whitelist.json in the data folder. 
 ```
 
-### Add script as service
-To start the script automatically, we create a service
+---
 
-```
-sudo nano /etc/systemd/system/telegram_bot.service
-```
+## 4. Run the Bot Manually (Optional)
 
-```
-[Unit]
-Description=Overseerr Telegram Bot
-After=network.target
+To verify that everything works correctly, you can run the bot manually:
 
-[Service]
-Type=simple
-ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/python3 /path/to/your/script.py   #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot/telegram_overseerr_bot.py
-WorkingDirectory=/path/to/your/script-directory      #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot
-Restart=always
-User=your-username
-Environment=PYTHONUNBUFFERED=1
-
-[Install]
-WantedBy=multi-user.target
-
+```bash
+python3 telegram_overseerr_bot.py
 ```
 
-```
-sudo systemctl daemon-reload
-sudo systemctl enable telegram_bot.service
-sudo systemctl start telegram_bot.service
-sudo systemctl status telegram_bot.service
-```
+---
+
+## 5. Run the Bot as a Service (Recommended)
+
+To ensure the bot starts automatically at boot, create a **systemd service**:
+
+1. Open a new service file:
+
+	```bash
+	sudo nano /etc/systemd/system/telegram_bot.service
+	```
+
+2. Add the following configuration (replace paths and username as needed):
+
+	```ini
+	[Unit]
+	Description=Overseerr Telegram Bot
+	After=network.target
+	
+	[Service]
+	Type=simple
+	ExecStartPre=/bin/sleep 10
+	ExecStart=/usr/bin/python3 /path/to/your/script.py   #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot/telegram_overseerr_bot.py
+	WorkingDirectory=/path/to/your/script-directory      #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot
+	Restart=always
+	User=your-username
+	Environment=PYTHONUNBUFFERED=1
+	
+	[Install]
+	WantedBy=multi-user.target
+	
+	```
+
+3. Save and exit the file (`Ctrl+O`, `Enter`, `Ctrl+X`).
+4. Reload systemd to apply changes, Enable and start the service
+
+	```
+	sudo systemctl daemon-reload
+	sudo systemctl enable telegram_bot.service
+	sudo systemctl start telegram_bot.service
+	```
+
+6. Check the service status to ensure it’s running:
+
+	```bash
+	sudo systemctl status telegram_bot.service
+	```
 
 ## Installation with Docker
 
