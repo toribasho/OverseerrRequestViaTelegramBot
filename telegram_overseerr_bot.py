@@ -22,7 +22,7 @@ from telegram.ext import (
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 BUILD = "2025.01.19.110"
 
 logging.basicConfig(
@@ -656,7 +656,7 @@ async def display_results_with_buttons(
     # Decide how to send/edit the message
     if new_message:
         sent_message = await context.bot.send_message(
-            chat_id=update_or_query.effective_chat.id,
+            chat_id=update_or_query.message.chat_id,
             text="Please select a result:",
             reply_markup=reply_markup
         )
@@ -675,7 +675,7 @@ async def display_results_with_buttons(
         return
     else:
         sent_message = await context.bot.send_message(
-            chat_id=update_or_query.effective_chat.id,
+            chat_id=update_or_query.message.chat_id,
             text="Please select a result:",
             reply_markup=reply_markup
         )
@@ -1139,7 +1139,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if old_msg_id:
                 try:
                     await context.bot.delete_message(
-                        chat_id=update.effective_chat.id,
+                        chat_id=update.message.chat_id,
                         message_id=old_msg_id
                     )
                     logger.info(f"Deleted old create-user message {old_msg_id}.")
@@ -1245,7 +1245,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if media_message_id:
             try:
                 await context.bot.delete_message(
-                    chat_id=update.effective_chat.id,
+                    chat_id=update.message.chat_id,
                     message_id=media_message_id
                 )
                 logger.info(f"Deleted media message {media_message_id} after issue reporting.")
