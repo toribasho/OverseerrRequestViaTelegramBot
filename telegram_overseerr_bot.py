@@ -22,8 +22,8 @@ from telegram.ext import (
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
-VERSION = "2.5.1"
-BUILD = "2025.01.27.111"
+VERSION = "2.6.0"
+BUILD = "2025.01.28.131"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -463,13 +463,84 @@ async def user_data_loader(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Nothing to load."
             )
 
+def get_global_telegram_notifications():
+    """
+    Retrieves the current global Telegram notification settings from Overseerr.
+    Returns a dictionary with the settings or None on error.
+    """
+    try:
+        url = f"{OVERSEERR_API_URL}/settings/notifications/telegram"
+        headers = {
+            "X-Api-Key": OVERSEERR_API_KEY
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        settings = response.json()
+        logger.info(f"Current Global Telegram notification settings: {settings}")
+        return settings
+    except requests.RequestException as e:
+        logger.error(f"Error when retrieving Telegram notification settings: {e}")
+        return None
+
+async def set_global_telegram_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Activates the global Telegram notifications in Overseerr.
+    Returns True if successful, otherwise False.
+    """
+
+    bot_info = await context.bot.get_me()
+    chat_id = str(update.effective_chat.id)
+
+    payload = {
+        "enabled": True,
+        "types": 4063,  # Activate all notification types (except silent)
+        "options": {
+            "botUsername": bot_info.username,  # Botname
+            "botAPI": TELEGRAM_TOKEN,          # Telegram Token
+            "chatId": chat_id,                 # Chat-ID - i guess the admin will use the bot first?
+            "sendSilently": True
+        }
+    }
+    try:
+        url = f"{OVERSEERR_API_URL}/settings/notifications/telegram"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Api-Key": OVERSEERR_API_KEY
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info("Global Telegram notifications have been successfully activated.")
+        return True
+    except requests.RequestException as e:
+        logger.error(f"Error when activating global Telegram notifications: {e}")
+        if e.response is not None:
+            logger.error(f"Response content: {e.response.text}")
+        return False
+
+GLOBAL_TELEGRAM_NOTIFICATION_STATUS = get_global_telegram_notifications()
+
+async def enable_global_telegram_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Activates global Telegram notifications
+    """
+    if GLOBAL_TELEGRAM_NOTIFICATION_STATUS:
+        enabled = GLOBAL_TELEGRAM_NOTIFICATION_STATUS.get("enabled", False)
+        if enabled:
+
+            logger.info("Global Telegram notifications are activated.")
+        else:
+            logger.info("Activate global Telegram notifications...")
+            await set_global_telegram_notifications(update, context)
+    else:
+        logger.error("Could not retrieve Global Telegram notification settings.")
+
+
 ###############################################################################
 #                           BOT COMMAND HANDLERS
 ###############################################################################
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /start command. Shows a welcome message.
-    Previously, we restored user data here, but now it's done in user_data_loader.
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} executed /start.")
@@ -478,6 +549,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"User {user_id} is not authorized. Requesting password.")
         await request_password(update, context)
         return
+
+    await enable_global_telegram_notifications(update, context)
 
     latest_version = get_latest_version_from_github()
     newer_version_text = ""
@@ -490,10 +563,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👋 Welcome to the Overseerr Telegram Bot! v{VERSION}"
         f"{newer_version_text}"
         "\n\n🎬 *What I can do:*\n"
-        "- Search movies & TV shows\n"
-        "- Check availability\n"
-        "- Request new titles\n"
-        "- Report issues\n\n"
+        " - 🔍 Search movies & TV shows\n"
+        " - 📊 Check availability\n"
+        " - 🎫 Request new titles\n"
+        " - 🛠 Report issues\n\n"
         "💡 *How to start:* Type `/check <title>`\n"
         "_Example: `/check Venom`_\n\n"
         "You can also select your user with [/settings]."
@@ -501,65 +574,343 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(start_message, parse_mode="Markdown")
 
-async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+########################################################################
+#                 UNIFIED SETTINGS MENU FUNCTION
+########################################################################
+async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE):
     """
-    /settings command. Lists all Overseerr users so the user can pick one.
-    Saves that choice to user_selection.json.
+    Displays the settings menu (both for /settings command and 'Back to Settings').
+    Checks if it's a callback query or a normal message, then edits or sends a new message.
     """
-    user_id = update.effective_user.id
-    logger.info(f"User {user_id} executed /settings.")
 
+    user_id = None
+    if isinstance(update_or_query, Update) and update_or_query.message:
+        # Called via /settings command
+        user_id = update_or_query.effective_user.id
+        logger.info(f"User {user_id} called /settings.")
+        is_callback = False
+    elif isinstance(update_or_query, CallbackQuery):
+        # Called via inline button
+        user_id = update_or_query.from_user.id
+        logger.info(f"User {user_id} requested 'Back to Settings'.")
+        is_callback = True
+    else:
+        return  # Should not happen in normal flows
+
+    # OPTIONAL: check authorization
     if PASSWORD and not user_is_authorized(user_id):
-        logger.info(f"User {user_id} is not authorized for /settings. Requesting password.")
-        await request_password(update, context)
+        logger.info(f"User {user_id} not authorized.")
+        await request_password(update_or_query, context)
         return
 
+    # Example: read user_data from context
     current_uid = context.user_data.get("overseerr_user_id")
     current_name = context.user_data.get("overseerr_user_name")
+
+    # Construct your heading text
     if current_uid and current_name:
         heading_text = (
-            f"⚙️ *Settings - Current User:* {current_name} (ID: {current_uid})\n\n"
-            "Select a user from the list below to change your selection:"
+            f"⚙️ *Settings* - Current User:\n"
+            f" {current_name} (ID: {current_uid}) ✅\n\n"
+            "Select an option below to manage your settings:"
         )
     else:
         heading_text = (
-            "⚙️ *Settings - No User Selected*\n\n"
-            "Select a user from the list below:"
+            "⚙️ *Settings* - No User Selected\n\n"
+            "❗️ *Please select a user to continue.*\n\n"
+            "Tap the *Change User* button below to pick an existing user or create a new one. It's quick and easy!"
         )
 
-    user_list = get_overseerr_users()
-    if not user_list:
+    # Define buttons
+    keyboard = [
+        [
+            InlineKeyboardButton("🔄 Change User", callback_data="change_user"),
+            InlineKeyboardButton("➕ Create New User", callback_data="create_user")
+        ],
+        [
+            InlineKeyboardButton("🔔 Manage Notifications", callback_data="manage_notifications")
+        ],
+        [
+            InlineKeyboardButton("❌ Close", callback_data="cancel_settings")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Decide if we edit or send a new message
+    if is_callback:
+        # We have a CallbackQuery => edit the existing message
+        query = update_or_query
+        await query.edit_message_text(
+            heading_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    else:
+        # Normal /settings command => send a new message
+        update = update_or_query
         await update.message.reply_text(
-            "Could not fetch user list from Overseerr. Please try again later."
+            heading_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+
+########################################################################
+#                    /settings COMMAND
+########################################################################
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handler for /settings command. Calls the unified show_settings_menu function.
+    """
+    await show_settings_menu(update, context)
+
+async def show_manage_notifications_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Displays a menu letting the user toggle:
+      - Telegram notifications on/off (interpreted from notificationTypes.telegram)
+      - Silent mode on/off (from telegramSendSilently)
+    for their selected Overseerr user, using partial updates.
+    """
+    # Check if it's a callback or normal command
+    if isinstance(update_or_query, Update) and update_or_query.message:
+        query = None
+        user_id = update_or_query.effective_user.id
+        chat_id = update_or_query.effective_chat.id
+    elif isinstance(update_or_query, CallbackQuery):
+        query = update_or_query
+        user_id = query.from_user.id
+        chat_id = query.message.chat_id
+    else:
+        return
+
+    # Which Overseerr user is selected?
+    overseerr_user_id = context.user_data.get("overseerr_user_id")
+    overseerr_user_name = context.user_data.get("overseerr_user_name", "Unknown User")
+
+    if not overseerr_user_id:
+        msg = "No Overseerr user selected. Use /settings to pick a user first."
+        if query:
+            await query.edit_message_text(msg)
+        else:
+            await update_or_query.message.reply_text(msg)
+        return
+
+    # Fetch from Overseerr to show real-time status
+    current_settings = get_user_notification_settings(overseerr_user_id)
+    if not current_settings:
+        error_text = f"Failed to retrieve notification settings for Overseerr user {overseerr_user_id}."
+        if query:
+            await query.edit_message_text(error_text)
+        else:
+            await update_or_query.message.reply_text(error_text)
+        return
+
+    # Extract relevant fields
+    # If notificationTypes or telegram is missing, default to 0
+    notification_types = current_settings.get("notificationTypes", {})
+    telegram_bitmask = notification_types.get("telegram", 0)
+    telegram_silent = current_settings.get("telegramSendSilently", False)
+
+    # We interpret telegram_bitmask > 0 to mean "enabled"
+    telegram_is_enabled = (telegram_bitmask != 0)
+
+    # Build the display text
+    heading_text = (
+        "🔔 *Notification Settings*\n"
+        "Manage how Overseerr sends you updates via Telegram.\n\n"
+        f"👤 *User Information:*\n"
+        f"   - Name: *{overseerr_user_name}* (ID: `{overseerr_user_id}`)\n\n"
+        "⚙️ *Current Telegram Settings:*\n"
+        f"   - Notifications: {'*Enabled* ✅' if telegram_is_enabled else '*Disabled* ❌'}\n"
+        f"   - Silent Mode: {'*On* 🤫' if telegram_silent else '*Off* 🔊'}\n\n"
+        "🔄 *Actions:*\n"
+        "Use the buttons below to toggle notifications or silent mode. "
+        "Your preferences will be updated immediately."
+    )
+
+    # Build inline keyboard
+    # "Disable Telegram" if currently enabled, or "Enable Telegram" if it's disabled
+    toggle_telegram_label = "Disable Telegram" if telegram_is_enabled else "Enable Telegram"
+    toggle_silent_label = "Turn Silent Off" if telegram_silent else "Turn Silent On"
+
+    keyboard = [
+        [
+            InlineKeyboardButton(toggle_telegram_label, callback_data="toggle_user_notifications")
+        ],
+        [
+            InlineKeyboardButton(toggle_silent_label, callback_data="toggle_user_silent")
+        ],
+        [
+            InlineKeyboardButton("⬅️ Back to Settings", callback_data="back_to_settings")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Edit or send message
+    if query:
+        await query.edit_message_text(
+            text=heading_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    else:
+        await update_or_query.message.reply_text(
+            text=heading_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+
+def get_user_notification_settings(overseerr_user_id: int) -> dict:
+    """
+    (Optional) Fetch the user's notification settings from Overseerr:
+    GET /api/v1/user/<OverseerrUserID>/settings/notifications
+    Returns a dict or an empty dict on error.
+    """
+    try:
+        url = f"{OVERSEERR_API_URL}/user/{overseerr_user_id}/settings/notifications"
+        headers = {
+            "X-Api-Key": OVERSEERR_API_KEY,
+            "Content-Type": "application/json"
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        logger.info(f"Fetched notification settings for Overseerr user {overseerr_user_id}: {data}")
+        return data
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch settings for user {overseerr_user_id}: {e}")
+        return {}
+
+def update_telegram_settings_for_user(
+    overseerr_user_id: int,
+    telegram_bitmask: int,       # either 3657 or 0
+    chat_id: str,
+    send_silently: bool
+) -> bool:
+    """
+    Sends a partial update to /user/<OverseerrUserID>/settings/notifications.
+    - telegram_bitmask=3657: enable all telegram notifications
+    - telegram_bitmask=0: disable all telegram notifications
+    - We set telegramEnabled=true because Overseerr apparently keeps it that way.
+    - telegramChatId is necessary so Overseerr knows which chat to use.
+    """
+    payload = {
+        "notificationTypes": {
+            "telegram": telegram_bitmask
+        },
+        "telegramEnabled": True,         # Always true in Overseerr DB
+        "telegramChatId": chat_id,       # Must provide the chat ID
+        "telegramSendSilently": send_silently
+    }
+
+    url = f"{OVERSEERR_API_URL}/user/{overseerr_user_id}/settings/notifications"
+    headers = {
+        "X-Api-Key": OVERSEERR_API_KEY,
+        "Content-Type": "application/json"
+    }
+    logger.info(f"Updating user {overseerr_user_id} with payload: {payload}")
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        resp.raise_for_status()
+        logger.info(f"Successfully updated telegram bitmask for user {overseerr_user_id}.")
+        return True
+    except requests.RequestException as e:
+        logger.error(f"Failed to update telegram bitmask for user {overseerr_user_id}: {e}")
+        if e.response is not None:
+            logger.error(f"Response content: {e.response.text}")
+        return False
+
+async def toggle_user_notifications(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
+    """
+    If the user currently has 0 => switch to 3657.
+    If the user currently has 3657 => switch to 0.
+    """
+    overseerr_user_id = context.user_data.get("overseerr_user_id")
+    if not overseerr_user_id:
+        await query.edit_message_text("No Overseerr user selected.")
+        return
+
+    # GET the current settings to see if it's 0 or not
+    settings = get_user_notification_settings(overseerr_user_id)
+    if not settings:
+        await query.edit_message_text(f"Failed to get settings for user {overseerr_user_id}.")
+        return
+    
+    # If "notificationTypes" or "notificationTypes.telegram" is missing, default to 0
+    notif_types = settings.get("notificationTypes", {})
+    current_value = notif_types.get("telegram", 0)
+
+    # Flip between 0 and 3657
+    new_value = 3657 if current_value == 0 else 0
+
+    telegram_silent = settings.get("telegramSendSilently", False)
+    chat_id = str(query.message.chat_id)
+
+    success = update_telegram_settings_for_user(
+        overseerr_user_id=overseerr_user_id,
+        telegram_bitmask=new_value,
+        chat_id=chat_id,
+        send_silently=telegram_silent
+    )
+
+    if not success:
+        await query.edit_message_text("❌ Failed to update Telegram bitmask in Overseerr.")
+        return
+
+    # Optionally re-fetch or trust your new data
+    await show_manage_notifications_menu(query, context)
+
+async def toggle_user_silent(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Toggles the 'telegramSendSilently' flag for the currently selected Overseerr user.
+    This only changes whether notifications (if enabled) are sent silently or not.
+    If notifications are disabled (bitmask=0), silent mode won't matter in practice,
+    but we still update the 'telegramSendSilently' field in Overseerr.
+    """
+    user_id = query.from_user.id
+
+    overseerr_user_id = context.user_data.get("overseerr_user_id")
+    if not overseerr_user_id:
+        await query.edit_message_text("No Overseerr user selected.")
+        return
+
+    current_settings = get_user_notification_settings(overseerr_user_id)
+    if not current_settings:
+        await query.edit_message_text(
+            f"Failed to fetch notification settings for user {overseerr_user_id}."
         )
         return
 
-    keyboard = []
-    for overseerr_user in user_list:
-        uid = overseerr_user["id"]
-        display_name = (
-            overseerr_user.get("displayName")
-            or overseerr_user.get("username")
-            or f"User {uid}"
-        )
-        callback_data = f"select_user_{uid}"
-        keyboard.append([InlineKeyboardButton(display_name, callback_data=callback_data)])
+    # Instead of relying on telegramEnabled (which Overseerr keeps 'true'),
+    # we read the actual bitmask from notificationTypes['telegram'].
+    notification_types = current_settings.get("notificationTypes", {})
+    current_bitmask = notification_types.get("telegram", 0)
 
-    create_user_button = [InlineKeyboardButton("➕ Create New User", callback_data="create_user")]
-    keyboard.append(create_user_button)
+    # Flip the silent mode
+    current_silent = current_settings.get("telegramSendSilently", False)
+    new_silent = not current_silent
 
-    # Add a separate row with a Cancel button
-    cancel_button_row = [InlineKeyboardButton("🔴 Cancel", callback_data="cancel_settings")]
-    keyboard.append(cancel_button_row)
+    # If current_bitmask == 0, the user effectively has Telegram disabled.
+    # Toggling silent won't enable them, but we can still store the preference.
+    chat_id = str(query.message.chat_id)
 
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        heading_text,
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+    success = update_telegram_settings_for_user(
+        overseerr_user_id=overseerr_user_id,
+        telegram_bitmask=current_bitmask,  # keep the same bitmask (0 = off, 3657 = on, etc.)
+        chat_id=chat_id,
+        send_silently=new_silent
     )
 
+    if not success:
+        await query.edit_message_text("❌ Failed to update silent mode in Overseerr.")
+        return
+
+    # Refresh the menu to display the new silent mode
+    await show_manage_notifications_menu(query, context)
+
+########################################################################
+#                    /check COMMAND
+########################################################################
 async def check_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /check <title> command. Searches for media on Overseerr
@@ -578,6 +929,7 @@ async def check_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "You haven't selected a user yet. Please use /settings first."
         )
+        await show_settings_menu(update, context)
         return
 
     if not context.args:
@@ -850,22 +1202,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "cancel_settings":
         # Simply edit the current message to say "Settings canceled" (or delete it).
         logger.info(f"User {user_id} canceled settings.")
-        await query.edit_message_text("🔴 Settings canceled. Use /start or /settings again any time.")
+        await query.edit_message_text(
+            "⚙️ Use /start or /settings to return anytime 😊",
+            parse_mode="Markdown")
         return
     
+    elif data == "change_user":
+        await handle_change_user(query, context)
+        return
+    
+    elif data == "manage_notifications":
+        await show_manage_notifications_menu(query, context)
+        return
+
+    elif data == "toggle_user_notifications":
+        await toggle_user_notifications(query, context)
+        return
+    
+    elif data == "toggle_user_silent":
+        await toggle_user_silent(query, context)
+        return
+
     elif data == "cancel_user_creation":
-        # If user wants to cancel in mid-conversation
         logger.info(f"User {user_id} canceled user creation.")
         context.user_data.pop("creating_new_user", None)
         context.user_data.pop("new_user_data", None)
 
-        # Edit message or send a new one
-        await query.edit_message_text(
-            "🔴 User creation canceled. Use /settings again to start over."
-        )
+        old_msg_id = context.user_data.pop("create_user_message_id", None)
+        if old_msg_id:
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=query.message.chat_id,
+                    message_id=old_msg_id,
+                    text="❌ User creation canceled."
+                )
+            except Exception as e:
+                logger.warning(f"Failed to edit creation message to 'canceled': {e}")
+
+        # Optionally go back to settings
+        await show_settings_menu(query, context)
+        return
+
+    elif data == "back_to_settings":
+        # Handle the 'Back to Settings' button
+        await show_settings_menu(query, context)
         return
     
-    if data == "create_user":
+    elif data == "create_user":
         logger.info(f"User {user_id} clicked on 'Create New User' button.")
         context.user_data["creating_new_user"] = True
         context.user_data["new_user_data"] = {}  # store partial info here
@@ -874,12 +1257,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["create_user_message_id"] = query.message.message_id
 
         # Show a prompt for email with a Cancel Creation button
-        keyboard = [[InlineKeyboardButton("🔴 Cancel Creation", callback_data="cancel_user_creation")]]
+        keyboard = [[InlineKeyboardButton("🔙 Cancel Creation", callback_data="cancel_user_creation")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Ask for the email
         await query.edit_message_text(
-            "Please enter the *email* for the new user:",
+            "➕ *Create New User*\n\n"
+            "📝 *Step 1:* Please enter the user's email address.\n"
+            "_(Make sure it’s valid, as Overseerr might use it for notifications)_",
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
@@ -906,12 +1291,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["overseerr_user_id"] = int(selected_user_id_str)
         context.user_data["overseerr_user_name"] = display_name
 
+        # Fetch notification settings for the selected user
+        current_settings = get_user_notification_settings(int(selected_user_id_str))
+        
+        # Check if Telegram notifications are enabled
+        notification_types = current_settings.get("notificationTypes", {})
+        telegram_bitmask = notification_types.get("telegram", 0)
+        if telegram_bitmask == 0:  # Notifications are disabled
+            chat_id = str(query.message.chat_id)
+            success = update_telegram_settings_for_user(
+                overseerr_user_id=int(selected_user_id_str),
+                chat_id=chat_id,
+                send_silently=current_settings.get("telegramSendSilently", False),
+                telegram_bitmask=3657  # Enable all notifications
+            )
+
         # Persist in JSON so it survives bot restarts
         save_user_selection(user_id, int(selected_user_id_str), display_name)
 
-        await query.edit_message_text(
-            f"✅ You have selected: {display_name} (ID: {selected_user_id_str})"
-        )
+        await show_settings_menu(query, context)
         return
 
     # User clicked a search result
@@ -1098,6 +1496,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 ###############################################################################
+#                HANDLE CHANGE USER FUNCTION
+###############################################################################
+async def handle_change_user(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles the 'Change User' button click. Presents a list of Overseerr users to select from.
+    """
+    user_id = query.from_user.id
+    logger.info(f"User {user_id} is attempting to change Overseerr user.")
+
+    user_list = get_overseerr_users()
+    if not user_list:
+        await query.edit_message_text("❌ Could not fetch user list from Overseerr. Please try again later.")
+        return
+
+    keyboard = []
+    for overseerr_user in user_list:
+        uid = overseerr_user["id"]
+        display_name = (
+            overseerr_user.get("displayName")
+            or overseerr_user.get("username")
+            or f"User {uid}"
+        )
+        callback_data = f"select_user_{uid}"
+        keyboard.append([InlineKeyboardButton(display_name, callback_data=callback_data)])
+
+    # Add a 'Back to Settings' button
+    keyboard.append([InlineKeyboardButton("🔙 Back to Settings", callback_data="back_to_settings")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "🔄 *Select an Overseerr User:*\n",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+###############################################################################
 #                 MESSAGE HANDLER: PASSWORD, NEW USER & ISSUE DESCRIPTION
 ###############################################################################
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1119,6 +1553,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text("✅ Password correct! You are now authorized to use the bot.")
             await start_command(update, context)  # Show the main menu again
+            await show_settings_menu(update, context)
             update_whitelist_in_config(user_id)
         else:
             logger.info(f"User {user_id} provided a wrong password.")
@@ -1129,65 +1564,81 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("creating_new_user"):
         new_user_data = context.user_data.setdefault("new_user_data", {})
 
+        # STEP 1: Email
         if "email" not in new_user_data:
-            # The user just typed the email
             new_user_data["email"] = text.strip()
-            logger.info(f"New user email: {new_user_data['email']}")
+            logger.info(f"Got new user email: {new_user_data['email']}")
 
-            # 1) Delete the old message that had the initial prompt/buttons
+            # Edit the SAME message (Step 1 -> Step 2)
+            old_msg_id = context.user_data.get("create_user_message_id")
+            if old_msg_id:
+                keyboard = [[InlineKeyboardButton("🔙 Cancel Creation", callback_data="cancel_user_creation")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                try:
+                    await context.bot.edit_message_text(
+                        chat_id=update.effective_chat.id,
+                        message_id=old_msg_id,
+                        text=(
+                            "➕ *Create New User*\n\n"
+                            "👤 *Step 2:* Great! Now, what should the *username* be?"
+                        ),
+                        parse_mode="Markdown",
+                        reply_markup=reply_markup
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to edit 'Step 1' message -> Step 2: {e}")
+
+            return
+
+        # STEP 2: Username
+        if "username" not in new_user_data:
+            new_user_data["username"] = text.strip()
+            logger.info(f"Got new user username: {new_user_data['username']}")
+
+            # (Optional) change the same message to a "creating user" or "please wait" note
             old_msg_id = context.user_data.get("create_user_message_id")
             if old_msg_id:
                 try:
-                    await context.bot.delete_message(
-                        chat_id=update.message.chat_id,
-                        message_id=old_msg_id
+                    await context.bot.edit_message_text(
+                        chat_id=update.effective_chat.id,
+                        message_id=old_msg_id,
+                        text="⏳ Creating the user in Overseerr..."
                     )
-                    logger.info(f"Deleted old create-user message {old_msg_id}.")
                 except Exception as e:
-                    logger.warning(f"Failed to delete old create-user message {old_msg_id}: {e}")
+                    logger.warning(f"Failed to edit message to 'please wait': {e}")
 
-                # Clear that ID so we don't delete it again
-                context.user_data.pop("create_user_message_id", None)
-
-            # 2) Now ask for the username in a brand-new message
-            #    (still including a 'Cancel Creation' button if you like)
-            keyboard = [[InlineKeyboardButton("🔙 Cancel Creation", callback_data="cancel_user_creation")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await update.message.reply_text(
-                "Got it! Now please enter a *username* for the new user:",
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
-            return
-
-        if "username" not in new_user_data:
-            # Now we store the username
-            new_user_data["username"] = text.strip()
-            logger.info(f"New user username: {new_user_data['username']}")
-
-            # 1) Tell the user "please wait" 
-            await update.message.reply_text("Please wait... creating user in Overseerr...")      
-
-            # We have both email & username => create user
+            # Now create the user
             success = create_overseerr_user(
                 email=new_user_data["email"],
                 username=new_user_data["username"],
-                permissions=12650656  # or some default
+                permissions=12650656
             )
 
             if success:
-                await update.message.reply_text(
-                    f"✅ New Overseerr user *{new_user_data['username']}* created successfully!"
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=old_msg_id,
+                    text=(
+                        f"✅ *Success!* The new user `{new_user_data['username']}` "
+                        f"(email `{new_user_data['email']}`) was created."
+                    ),
+                    parse_mode="Markdown"
                 )
             else:
-                await update.message.reply_text(
-                    "❌ Failed to create new user. Please check logs."
+                await context.bot.edit_message_text(
+                    chat_id=update.effective_chat.id,
+                    message_id=old_msg_id,
+                    text="❌ Failed to create the new user. Check logs."
                 )
 
-            # Cleanup: end the conversation
+            # Cleanup
             context.user_data.pop("creating_new_user", None)
             context.user_data.pop("new_user_data", None)
+            context.user_data.pop("create_user_message_id", None)
+
+            # Redirect to settings
+            await show_settings_menu(update, context)
             return
 
     # 3) Issue reporting input
@@ -1297,7 +1748,6 @@ def create_overseerr_user(email: str, username: str, permissions: int = 12650656
             logger.error(f"Response content: {e.response.text}")
         return False
 
-
 ###############################################################################
 #                               MAIN ENTRY POINT
 ###############################################################################
@@ -1309,20 +1759,20 @@ def main():
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # 1) user_data_loader runs FIRST for every incoming update (group=-999).
-    #    Ensures the user's Overseerr selection is loaded from JSON if not present.
+    # user_data_loader runs FIRST for every incoming update (group=-999).
+    # Ensures the user's Overseerr selection is loaded from JSON if not present.
     app.add_handler(MessageHandler(filters.ALL, user_data_loader), group=-999)
     app.add_handler(CallbackQueryHandler(user_data_loader), group=-999)
 
-    # 2) Register command handlers
+    # Register command handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("settings", settings_command))
     app.add_handler(CommandHandler("check", check_media))
 
-    # 3) Register callback query handler (for inline buttons)
+    # Register callback query handler (for inline buttons)
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # 4) Register a message handler for non-command text
+    # Register a message handler for non-command text
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     logger.info("Bot is starting polling...")
