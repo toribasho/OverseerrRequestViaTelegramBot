@@ -185,7 +185,7 @@ Our [Docker Hub](https://hub.docker.com/repository/docker/chimpanzeesweetrolls/o
 version: "3.9" # Specifies the version of the Docker Compose file format
 services:
   telegram-bot: # The name of the service (container)
-	image: chimpanzeesweetrolls/overseerrrequestviatelegrambot:2.4.0 # you can also use :latest
+	image: chimpanzeesweetrolls/overseerrrequestviatelegrambot:latest
 	environment:
 	  OVERSEERR_API_URL: "http://your-overseerr-ip:5055/api/v1"
 	  OVERSEERR_API_KEY: "your_overseerr_api_key"
@@ -205,7 +205,7 @@ docker run -d \
     -e OVERSEERR_API_KEY="your_overseerr_api_key" \ 
     -e TELEGRAM_TOKEN="your_telegram_token" \ 
     -e PASSWORD="your_password" \
-    chimpanzeesweetrolls/overseerrrequestviatelegrambot:2.4.0 # you can also use :latest
+    chimpanzeesweetrolls/overseerrrequestviatelegrambot:latest
 ```
 
 ### NAS GUI (QNAP as an example, other manufacturers should be similar)
