@@ -5,12 +5,14 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 
 ### 🌟 Features
 
-- **🔍 Simple Search** - Quickly search for series and movies
-- **📥 Easy Requests** - Submit media requests with just a few taps.
+- **🔍 Simple Search** - Quickly search for movies and series
+- **📥 Easy Requests** - Submit media requests with just a few taps
 - **🛠 Issue Reporting** - Report any issues or problems
-- **📊 Status Tracking** - View the status of requests to see if media has been requested, is available, or is being processed.
-- **👌 User-Friendly** - Intuitive and easy to use, ensuring a seamless media management experience.
-- **🔒 Access Control** - Optional password protection to restrict access to the bot.
+- **📊 Check Availability** – See if a movie or show is already in your library, pending approval, or being processed
+- **🔔 Get Notified** – Get notification updates for your requests 
+- **👥 User Management** - Multi-user support to share the bot with friends
+- **👌 User-Friendly** - Intuitive and easy to use, ensuring a seamless media management experience
+- **🔒 Access Control** – Set up a password to restrict access
 
 
 ## How to use
