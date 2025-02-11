@@ -1,5 +1,7 @@
-# Overseerr Telegram Bot
-A phyton script to request media via a Telegram bot via Overseerr
+# Overseerr Telegram Bot ![Logo32](https://github.com/user-attachments/assets/4344ff43-92a4-4834-8485-620756ba8a90)
+
+A phyton script to request media via a Telegram bot via Overseerr 
+
 
 The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, enabling you to request movies and TV shows directly within Telegram.
 
@@ -23,14 +25,15 @@ The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, ena
 > [!Note]
 > The language of the media titles and descriptions will match the language setting configured in Overseerr.
 
+![2 7 - 1](https://github.com/user-attachments/assets/98a53f45-dff1-4d0f-8195-d02f0fe28cd1)
 
-![2 3 - 1](https://github.com/user-attachments/assets/a2191778-0b33-4de7-841d-7f7b4c53bf4d)
+![2 7 - 4](https://github.com/user-attachments/assets/7b66b137-b7e9-4cbc-b6c0-a008e3d35897)
+![2 7 - 3](https://github.com/user-attachments/assets/f406b8f8-1f0c-4929-b5fa-32826ecebea0)
 
-![2 1 - 2](https://github.com/user-attachments/assets/edb2c57a-6983-4b9a-8ed5-e9acacf3e143)
-![2 1 - 6](https://github.com/user-attachments/assets/26f41f63-0a9d-4845-b0b2-61ffcba799bb)
-
-![2 1 - 3](https://github.com/user-attachments/assets/4059e277-c608-44df-8c79-71df1ccb3b0f)
+![2 7 - 7](https://github.com/user-attachments/assets/554aa8e3-ef51-40d3-9b3f-2f628c44693b)
 ![2 1 - 4](https://github.com/user-attachments/assets/000d286f-b0ac-4ebe-b6bb-9b66fa619da8)
+
+![2 7 - 8](https://github.com/user-attachments/assets/e5600e44-3766-4df7-a3c1-2330fcb4d6d2)
 
 
 ## Update on Ubuntu / Linux
