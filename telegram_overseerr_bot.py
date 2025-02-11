@@ -22,8 +22,8 @@ from telegram.ext import (
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
-VERSION = "2.6.0"
-BUILD = "2025.01.28.131"
+VERSION = "2.7.0"
+BUILD = "2025.02.11.160"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -73,6 +73,12 @@ ISSUE_TYPES = {
     4: "Other"
 }
 
+# Contains the authorisation bit for 4K
+PERMISSION_4K_MOVIE = 2048
+PERMISSION_4K_TV = 4096
+
+DEFAULT_POSTER_URL = "https://raw.githubusercontent.com/sct/overseerr/refs/heads/develop/public/images/overseerr_poster_not_found.png"
+
 os.makedirs("data", exist_ok=True)  # Ensure 'data/' folder exists
 
 ###############################################################################
@@ -86,31 +92,16 @@ USER_SELECTION_FILE = "data/user_selection.json"
 ###############################################################################
 def load_whitelist():
     """
-    Load the whitelist from JSON or migrate from config.py if needed.
-    Returns a set of Telegram user IDs that are authorized to use the bot.
+    Load the whitelist from JSON or create a new empty one if not found.
     """
     try:
         with open(WHITELIST_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             return set(data)
     except (FileNotFoundError, json.JSONDecodeError):
-        logger.warning("Whitelist file not found or invalid. Attempting config.py migration...")
-        try:
-            from config import WHITELIST
-            if WHITELIST and isinstance(WHITELIST, list):
-                whitelist_set = set(WHITELIST)
-                save_whitelist(whitelist_set)
-                logger.info("Whitelist migrated from config.py.")
-                clear_whitelist_in_config()
-                return whitelist_set
-            else:
-                logger.warning("No valid WHITELIST found in config.py. Creating a new file.")
-                save_whitelist(set())
-                return set()
-        except (ImportError, AttributeError):
-            logger.warning("config.py or WHITELIST not found. Creating a new whitelist file.")
-            save_whitelist(set())
-            return set()
+        logger.warning("Whitelist file not found or invalid. Creating a new empty file.")
+        save_whitelist(set())
+        return set()
 
 def save_whitelist(whitelist):
     """
@@ -122,28 +113,6 @@ def save_whitelist(whitelist):
         logger.info("Whitelist saved successfully.")
     except Exception as e:
         logger.error(f"Failed to save whitelist: {e}")
-
-def clear_whitelist_in_config():
-    """
-    Clears the WHITELIST in config.py (if present),
-    to ensure no duplication between file-based and config-based whitelists.
-    """
-    config_file_path = "config.py"
-    try:
-        with open(config_file_path, "r+", encoding="utf-8") as f:
-            lines = f.readlines()
-            f.seek(0)
-            f.truncate()
-            for line in lines:
-                if line.strip().startswith("WHITELIST"):
-                    f.write("WHITELIST = []\n")
-                else:
-                    f.write(line)
-        logger.info("WHITELIST in config.py cleared.")
-    except FileNotFoundError:
-        logger.info("config.py not found. Nothing to clear.")
-    except Exception as e:
-        logger.error(f"Failed to clear WHITELIST in config.py: {e}")
 
 in_memory_whitelist = load_whitelist()
 
@@ -294,20 +263,8 @@ def search_media(media_name: str):
 
 def process_search_results(results: list):
     """
-    Process Overseerr search results into a simplified list of dicts:
-    [
-      {
-        "title": "...",
-        "year": "...",
-        "id": ...,
-        "mediaType": "...",
-        "status": ...,
-        "poster": "...",
-        "description": "...",
-        "overseerr_id": ...
-      },
-      ...
-    ]
+    Process Overseerr search results into a simplified list of dicts.
+    Each dict contains relevant fields (title, year, mediaType, etc.).
     """
     processed_results = []
     for result in results:
@@ -319,23 +276,27 @@ def process_search_results(results: list):
         )
 
         date_key = "firstAirDate" if result["mediaType"] == "tv" else "releaseDate"
-        media_year = result.get(date_key, "") or "Unknown Year"
-        if media_year and "-" in media_year:
-            media_year = media_year.split("-")[0]
+        full_date_str = result.get(date_key, "")  # e.g. "2024-05-12"
+
+        # Extract just the year from the date (if it exists)
+        media_year = full_date_str.split("-")[0] if "-" in full_date_str else "Unknown Year"
 
         media_info = result.get("mediaInfo", {})
-        media_status = media_info.get("status")
         overseerr_media_id = media_info.get("id")
+        hd_status = media_info.get("status", 1)
+        uhd_status = media_info.get("status4k", 1)
 
         processed_results.append({
             "title": media_title,
             "year": media_year,
-            "id": result["id"],  # often the TMDb ID
+            "id": result["id"],  # usually the TMDb ID
             "mediaType": result["mediaType"],
-            "status": media_status,
             "poster": result.get("posterPath"),
             "description": result.get("overview", "No description available"),
-            "overseerr_id": overseerr_media_id
+            "overseerr_id": overseerr_media_id,
+            "release_date_full": full_date_str,
+            "status_hd": hd_status,
+            "status_4k": uhd_status
         })
 
     logger.info(f"Processed {len(results)} search results.")
@@ -344,22 +305,32 @@ def process_search_results(results: list):
 ###############################################################################
 #              OVERSEERR API: REQUEST & ISSUE CREATION
 ###############################################################################
-def request_media(media_id: int, media_type: str, is_tv: bool, requested_by: int = None) -> bool:
+def request_media(
+    media_id: int,
+    media_type: str,
+    requested_by: int,
+    is4k: bool
+) -> tuple[bool, str]:
     """
-    Create a request on Overseerr for the specified media.
-    In Overseerr v1, the field is "userId" for the requesting user.
+    Sends a request to Overseerr for a media item.
+        media_id (int): The media's ID
+        media_type (str): "movie" or "tv".
+        requested_by (int): Overseerr user ID making the request.
+        is4k (bool): True to request the 4K version, False for 1080p.
+    Returns:
+        tuple[bool, str]: (True, "") if the request succeeded, otherwise (False, error_message).
     """
+
     payload = {
         "mediaId": media_id,
         "mediaType": media_type,
+        "userId": requested_by,
+        "is4k": is4k # True => 4K, False => 1080p
     }
-    if is_tv:
+    
+    if media_type == "tv":
         payload["seasons"] = "all"
 
-    if requested_by is not None:
-        payload["userId"] = requested_by
-
-    logger.info(f"Sending request payload to Overseerr: {payload}")
     try:
         response = requests.post(
             f"{OVERSEERR_API_URL}/request",
@@ -368,16 +339,21 @@ def request_media(media_id: int, media_type: str, is_tv: bool, requested_by: int
                 "X-Api-Key": OVERSEERR_API_KEY,
             },
             json=payload,
-            timeout=10,
+            timeout=10
         )
         response.raise_for_status()
-        logger.info(f"Request successful for mediaId {media_id}.")
-        return True
+        return True, ""
     except requests.RequestException as e:
-        logger.error(f"Error during media request: {e}")
         if e.response is not None:
-            logger.error(f"Response content: {e.response.text}")
-        return False
+            try:
+                error_data = e.response.json()
+                error_message = error_data.get("message", e.response.text)
+            except Exception:
+                error_message = e.response.text
+        else:
+            error_message = str(e)
+        logger.error(f"Request for media {media_id} (4K={is4k}) failed: {error_message}")
+        return False, error_message
 
 def create_issue(media_id: int, media_type: str, issue_description: str, issue_type: int, user_id: int = None):
     """
@@ -493,7 +469,7 @@ async def set_global_telegram_notifications(update: Update, context: ContextType
 
     payload = {
         "enabled": True,
-        "types": 4063,  # Activate all notification types (except silent)
+        "types": 1,  # Disable all notification types (except silent)
         "options": {
             "botUsername": bot_info.username,  # Botname
             "botAPI": TELEGRAM_TOKEN,          # Telegram Token
@@ -597,13 +573,12 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
     else:
         return  # Should not happen in normal flows
 
-    # OPTIONAL: check authorization
+    # check authorization
     if PASSWORD and not user_is_authorized(user_id):
         logger.info(f"User {user_id} not authorized.")
         await request_password(update_or_query, context)
         return
 
-    # Example: read user_data from context
     current_uid = context.user_data.get("overseerr_user_id")
     current_name = context.user_data.get("overseerr_user_name")
 
@@ -728,8 +703,8 @@ async def show_manage_notifications_menu(update_or_query, context: ContextTypes.
     )
 
     # Build inline keyboard
-    # "Disable Telegram" if currently enabled, or "Enable Telegram" if it's disabled
-    toggle_telegram_label = "Disable Telegram" if telegram_is_enabled else "Enable Telegram"
+    # "Disable notifications" if currently enabled, or "Enable notifications" if it's disabled
+    toggle_telegram_label = "Disable notifications" if telegram_is_enabled else "Enable notifications"
     toggle_silent_label = "Turn Silent Off" if telegram_silent else "Turn Silent On"
 
     keyboard = [
@@ -1044,53 +1019,115 @@ async def process_user_selection(
 ):
     """
     Displays details about the selected media (poster, description, status).
-    Offers a request or issue-report button if applicable.
+    Shows buttons for 1080p, 4K, or both—depending on user permissions.
     """
+    REQUESTED_STATUSES = [STATUS_PENDING, STATUS_PROCESSING, STATUS_PARTIALLY_AVAILABLE, STATUS_AVAILABLE]
+    # Determine whether this was triggered by a CallbackQuery
     if isinstance(update_or_query, Update):
         query = update_or_query.callback_query
     else:
         query = update_or_query
 
-    media_title = result["title"]
-    media_year = result["year"]
-    media_id = result["id"]  # Usually the TMDb ID
-    media_type = result["mediaType"]
+    # Basic media info
+    media_title = result.get("title", "Unknown Title")
+    media_year = result.get("year", "????")
     poster = result.get("poster")
     description = result.get("description", "No description available")
-    media_status = result.get("status")
+
+    status_hd = result.get("status_hd", STATUS_UNKNOWN)
+    status_4k = result.get("status_4k", STATUS_UNKNOWN)
     overseerr_media_id = result.get("overseerr_id")
 
-    context.user_data['selected_result'] = result
+    # Save the result for potential future actions (report issue, etc.)
+    context.user_data["selected_result"] = result
 
+    overseerr_user_id = context.user_data.get("overseerr_user_id")
+
+    # Decide if the user can request 4K for this media_type
+    user_has_4k_permission = False
+    if overseerr_user_id:
+        user_has_4k_permission = user_can_request_4k(overseerr_user_id, result.get("mediaType", ""))
+
+    # Inline function to interpret the numeric status codes
+    def interpret_status(code: int) -> str:
+        if code == STATUS_AVAILABLE:
+            return "Available ✅"
+        elif code == STATUS_PROCESSING:
+            return "Processing ⏳"
+        elif code == STATUS_PARTIALLY_AVAILABLE:
+            return "Partially available ⏳"
+        elif code == STATUS_PENDING:
+            return "Pending ⏳"
+        else:
+            # If not requested (STATUS_UNKNOWN), return an empty string.
+            return ""
+
+    # Helper to see if we can request a given resolution
+    def can_request_resolution(code: int) -> bool:
+        return code not in REQUESTED_STATUSES
+
+    # Build the inline keyboard
+    keyboard = []
     back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
 
-    # Decide how to display request/issue options based on status
-    if media_status in [STATUS_AVAILABLE, STATUS_PROCESSING, STATUS_PARTIALLY_AVAILABLE]:
-        if media_status == STATUS_AVAILABLE:
-            status_message = "already available ✅"
-        elif media_status == STATUS_PROCESSING:
-            status_message = "being processed ⏳"
-        elif media_status == STATUS_PARTIALLY_AVAILABLE:
-            status_message = "partially available ⏳"
-        else:
-            status_message = "not available"
+    # Build request_buttons list
+    request_buttons = []
+    if can_request_resolution(status_hd):
+        btn_1080p = InlineKeyboardButton("📥 1080p", callback_data=f"confirm_1080p_{result['id']}")
+        request_buttons.append(btn_1080p)
 
-        if overseerr_media_id:
-            report_button = InlineKeyboardButton("🛠 Report Issue", callback_data=f"report_{overseerr_media_id}")
-            keyboard = [[back_button, report_button]]
-        else:
-            keyboard = [[back_button]]
+    if user_has_4k_permission and can_request_resolution(status_4k):
+        btn_4k = InlineKeyboardButton("📥 4K", callback_data=f"confirm_4k_{result['id']}")
+        request_buttons.append(btn_4k)
 
-        footer_message = f"ℹ️ *{media_title}* is {status_message}."
+    if user_has_4k_permission and can_request_resolution(status_hd) and can_request_resolution(status_4k):
+        btn_both = InlineKeyboardButton("📥 Both", callback_data=f"confirm_both_{result['id']}")
+        request_buttons.append(btn_both)
+
+    # Adjust labels if exactly two buttons are present
+    if len(request_buttons) == 1:
+        new_buttons = []
+        for btn in request_buttons:
+            if "Request" not in btn.text:
+                new_text = "📥 Request " + btn.text.lstrip("📥 ").strip()
+            else:
+                new_text = btn.text
+            new_buttons.append(InlineKeyboardButton(new_text, callback_data=btn.callback_data))
+        request_buttons = new_buttons
+
+    if request_buttons:
+        keyboard.append(request_buttons)
+
+
+    # Show Report Issue if any resolution is pending/processing/partial/available
+    def is_reportable(code: int) -> bool:
+        return code in [STATUS_PENDING, STATUS_PROCESSING, STATUS_PARTIALLY_AVAILABLE, STATUS_AVAILABLE]
+
+    if (is_reportable(status_hd) or is_reportable(status_4k)) and overseerr_media_id:
+        report_button = InlineKeyboardButton("🛠 Report Issue", callback_data=f"report_{overseerr_media_id}")
+        keyboard.append([report_button])
+
+    keyboard.append([back_button])
+
+    # Construct the main message text (with inline status interpretation)
+    status_hd_str = interpret_status(status_hd)
+    status_4k_str = interpret_status(status_4k)
+
+    status_lines = []
+    if status_hd_str:
+        status_lines.append(f"• 1080p: {status_hd_str}")
+    if status_4k_str:
+        status_lines.append(f"• 4K: {status_4k_str}")
+
+    if status_lines:
+        status_block = "*Current status*:\n" + "\n".join(status_lines)
     else:
-        # If not available, let them request it
-        request_button = InlineKeyboardButton("📥 Request", callback_data=f"confirm_{media_id}")
-        keyboard = [[back_button, request_button]]
-        footer_message = ""
+        status_block = ""
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    media_heading = f"*{media_title} ({media_year})*"
+    message_text = f"{media_heading}\n\n{description}\n\n{status_block}"
 
-    # If we previously stored a results_message_id, remove it to avoid confusion
+    # If we have an old results_message_id, delete it
     results_message_id = context.user_data.get("results_message_id")
     if results_message_id:
         try:
@@ -1100,49 +1137,65 @@ async def process_user_selection(
             )
             logger.info(f"Deleted previous results message {results_message_id}.")
         except Exception as e:
-            logger.warning(f"Failed to delete message {results_message_id}: {e}")
+            logger.debug(f"Could not delete previous results message {results_message_id}: {e}")
         context.user_data.pop("results_message_id", None)
 
-    media_message = f"*{media_title} ({media_year})*\n\n{description}"
-    if footer_message:
-        media_message += f"\n\n{footer_message}"
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    media_preview_url = f"https://image.tmdb.org/t/p/w500{poster}" if poster else None
+    # Finally send or edit the message (photo or text)
+    # Use provided poster or default poster if none available
+    media_preview_url = f"https://image.tmdb.org/t/p/w500{poster}" if poster else DEFAULT_POSTER_URL
 
-    # Depending on your design, send a new message or edit the existing one
-    if media_preview_url:
-        if edit_message:
+    if edit_message:
+        # If the original message is a photo, edit its caption, otherwise edit the text.
+        if query.message.photo:
             await query.edit_message_caption(
-                caption=media_message,
+                caption=message_text,
                 parse_mode="Markdown",
-                reply_markup=reply_markup,
+                reply_markup=reply_markup
             )
-            context.user_data['media_message_id'] = query.message.message_id
+            context.user_data["media_message_id"] = query.message.message_id
         else:
-            sent_message = await context.bot.send_photo(
-                chat_id=query.message.chat_id,
-                photo=media_preview_url,
-                caption=media_message,
-                parse_mode="Markdown",
-                reply_markup=reply_markup,
-            )
-            context.user_data['media_message_id'] = sent_message.message_id
-    else:
-        if edit_message:
             await query.edit_message_text(
-                text=media_message,
+                text=message_text,
                 parse_mode="Markdown",
-                reply_markup=reply_markup,
+                reply_markup=reply_markup
             )
-            context.user_data['media_message_id'] = query.message.message_id
-        else:
-            sent_message = await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=media_message,
-                parse_mode="Markdown",
-                reply_markup=reply_markup,
-            )
-            context.user_data['media_message_id'] = sent_message.message_id
+            context.user_data["media_message_id"] = query.message.message_id
+    else:
+        sent_msg = await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=media_preview_url,
+            caption=message_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        context.user_data["media_message_id"] = sent_msg.message_id
+
+def user_can_request_4k(overseerr_user_id: int, media_type: str) -> bool:
+    """
+    Returns True if this user can request 4K for the specified media_type.
+    """
+    all_users = get_overseerr_users()
+    user_info = next((u for u in all_users if u["id"] == overseerr_user_id), None)
+    if not user_info:
+        logger.warning(f"No user found with Overseerr ID {overseerr_user_id}")
+        return False
+
+    user_permissions = user_info.get("permissions", 0)
+
+    # Grant all 4K permissions to admin users (permission value 2)
+    if user_permissions == 2:
+        return True
+
+    # PERMISSION_4K_MOVIE: 2048 bit
+    # PERMISSION_4K_TV = 4096 bit
+    if media_type == "movie":
+        return (user_permissions & PERMISSION_4K_MOVIE) == PERMISSION_4K_MOVIE
+    elif media_type == "tv":
+        return (user_permissions & PERMISSION_4K_TV) == PERMISSION_4K_TV
+    else:
+        return False
 
 ###############################################################################
 #            cancel_search: CANCEL CURRENT SEARCH & CLEANUP
@@ -1165,7 +1218,8 @@ async def cancel_search(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
             )
             logger.info(f"Deleted search results message {results_message_id}.")
         except Exception as e:
-            logger.warning(f"Failed to delete results message {results_message_id}: {e}")
+            # Not critical - sometimes the message is already deleted.
+            logger.debug(f"Could not delete search results message {results_message_id}: {e}")
         context.user_data.pop("results_message_id", None)
 
     # Clear any saved search results from context
@@ -1174,103 +1228,116 @@ async def cancel_search(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
     # Notify user
     await context.bot.send_message(
         chat_id=query.message.chat_id,
-        text="🔴 Search cancelled.",
+        text=f"🔍 Search canceled. \n"
+        f"💡 Type `/check <title>` for a new search\n",
+        parse_mode="Markdown"
     )
+
+ISSUE_TYPES = {
+    1: "Video",
+    2: "Audio",
+    3: "Subtitle",
+    4: "Other"
+}
 
 ###############################################################################
 #   button_handler: PROCESSES ALL INLINE BUTTON CLICKS (search, confirm, etc.)
 ###############################################################################
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Main callback handler for inline button clicks (search selection, pagination,
-    confirm request, report issue, etc.)
+    Main callback handler for inline button clicks.
+    Handles pagination, selection, confirming requests
+    (1080p, 4K, or Both), issue reporting, user management, etc.
     """
     query = update.callback_query
     data = query.data
     user_id = query.from_user.id
 
     logger.info(f"User {user_id} pressed a button with callback data: {data}")
-    await query.answer()
+    await query.answer()  # Acknowledge the button press immediately
 
+    # 1) Authorization check (if your bot is password-protected)
     if PASSWORD and not user_is_authorized(user_id):
-        logger.info(f"User {user_id} is not authorized. Editing message to show an error.")
+        logger.info(f"User {user_id} is not authorized. Showing an error.")
         await query.edit_message_text(
             text="You need to be authorized. Please use /start and enter the password first."
         )
         return
-    
+
+    # 2) Handle various callback_data cases
+
+    # ---------------------------------------------------------
+    # A) Settings / User management / Notifications
+    # ---------------------------------------------------------
     if data == "cancel_settings":
-        # Simply edit the current message to say "Settings canceled" (or delete it).
         logger.info(f"User {user_id} canceled settings.")
         await query.edit_message_text(
-            "⚙️ Use /start or /settings to return anytime 😊",
-            parse_mode="Markdown")
+            "⚙️ Settings closed. Use /start or /settings to return."
+        )
         return
-    
+
     elif data == "change_user":
+        logger.info(f"User {user_id} wants to change Overseerr user.")
         await handle_change_user(query, context)
         return
-    
+
     elif data == "manage_notifications":
+        logger.info(f"User {user_id} wants to manage notifications.")
         await show_manage_notifications_menu(query, context)
         return
 
     elif data == "toggle_user_notifications":
+        logger.info(f"User {user_id} toggling their Telegram notifications.")
         await toggle_user_notifications(query, context)
         return
-    
+
     elif data == "toggle_user_silent":
+        logger.info(f"User {user_id} toggling silent mode.")
         await toggle_user_silent(query, context)
+        return
+
+    elif data == "create_user":
+        logger.info(f"User {user_id} clicked 'Create New User'.")
+        context.user_data["creating_new_user"] = True
+        context.user_data["new_user_data"] = {}
+        context.user_data["create_user_message_id"] = query.message.message_id
+
+        keyboard = [[InlineKeyboardButton("🔙 Cancel Creation", callback_data="cancel_user_creation")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=(
+                "➕ *Create New User*\n\n"
+                "Step 1: Please enter the user's email address."
+            ),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
         return
 
     elif data == "cancel_user_creation":
         logger.info(f"User {user_id} canceled user creation.")
         context.user_data.pop("creating_new_user", None)
         context.user_data.pop("new_user_data", None)
-
-        old_msg_id = context.user_data.pop("create_user_message_id", None)
-        if old_msg_id:
-            try:
-                await context.bot.edit_message_text(
-                    chat_id=query.message.chat_id,
-                    message_id=old_msg_id,
-                    text="❌ User creation canceled."
-                )
-            except Exception as e:
-                logger.warning(f"Failed to edit creation message to 'canceled': {e}")
-
-        # Optionally go back to settings
+        # Return to settings
         await show_settings_menu(query, context)
         return
 
     elif data == "back_to_settings":
-        # Handle the 'Back to Settings' button
+        logger.info(f"User {user_id} going back to settings.")
         await show_settings_menu(query, context)
         return
-    
-    elif data == "create_user":
-        logger.info(f"User {user_id} clicked on 'Create New User' button.")
-        context.user_data["creating_new_user"] = True
-        context.user_data["new_user_data"] = {}  # store partial info here
 
-        # Keep track of this message ID so we can delete it later
-        context.user_data["create_user_message_id"] = query.message.message_id
-
-        # Show a prompt for email with a Cancel Creation button
-        keyboard = [[InlineKeyboardButton("🔙 Cancel Creation", callback_data="cancel_user_creation")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Ask for the email
-        await query.edit_message_text(
-            "➕ *Create New User*\n\n"
-            "📝 *Step 1:* Please enter the user's email address.\n"
-            "_(Make sure it’s valid, as Overseerr might use it for notifications)_",
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-        return
-
+    # ---------------------------------------------------------
+    # B) Search pagination / selection
+    # ---------------------------------------------------------
+    # Assume "search_results" are in context.user_data from /check command
     results = context.user_data.get("search_results", [])
+
+    if data.startswith("page_"):
+        offset = int(data.split("_")[1])
+        logger.info(f"User {user_id} requested page offset {offset}.")
+        await display_results_with_buttons(query, context, results, offset)
+        return
 
     # Handle user selection from /settings
     if data.startswith("select_user_"):
@@ -1312,140 +1379,154 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_settings_menu(query, context)
         return
 
-    # User clicked a search result
     if data.startswith("select_"):
+        # e.g. "select_3" -> index = 3
         result_index = int(data.split("_")[1])
-        if result_index < len(results):
+        if 0 <= result_index < len(results):
             selected_result = results[result_index]
-            logger.info(f"User {user_id} selected result index {result_index}: {selected_result['title']}")
-            await process_user_selection(update, context, selected_result)
+            logger.info(f"User {user_id} selected index {result_index}: {selected_result['title']}")
+            await process_user_selection(query, context, selected_result)
         else:
-            logger.warning(f"Invalid result index {result_index}.")
+            logger.warning(f"Invalid search result index: {result_index}")
+            await query.edit_message_text("Invalid selection. Please try again.")
         return
 
-    # Page navigation
-    if data.startswith("page_"):
-        offset = int(data.split("_")[1])
-        logger.info(f"User {user_id} requested page offset {offset}.")
-        await display_results_with_buttons(query, context, results, offset)
-        return
-
-    # Confirm a request
-    if data.startswith("confirm_"):
-        media_id = int(data.split("_")[1])
-        selected_result = next((r for r in results if r["id"] == media_id), None)
-        if selected_result:
-            is_tv = (selected_result["mediaType"] == "tv")
-            media_status = selected_result.get("status")
-            overseerr_user_id = context.user_data.get("overseerr_user_id")
-            logger.info(
-                f"User {user_id} confirmed request for mediaId {media_id}, "
-                f"Overseerr user {overseerr_user_id}."
-            )
-
-            if media_status in [STATUS_AVAILABLE, STATUS_PROCESSING, STATUS_PARTIALLY_AVAILABLE]:
-                # Already available or in progress
-                if media_status == STATUS_AVAILABLE:
-                    message = f"ℹ️ *{selected_result['title']}* is already available."
-                elif media_status == STATUS_PROCESSING:
-                    message = f"⏳ *{selected_result['title']}* is currently being processed."
-                elif media_status == STATUS_PARTIALLY_AVAILABLE:
-                    message = f"⏳ *{selected_result['title']}* is partially available."
-                else:
-                    message = f"ℹ️ *{selected_result['title']}* cannot be requested at this time."
-
-                if query.message.photo:
-                    await query.edit_message_caption(caption=message, parse_mode="Markdown")
-                else:
-                    await query.edit_message_text(text=message, parse_mode="Markdown")
-
-            else:
-                # Make a request if we have an Overseerr user
-                if overseerr_user_id:
-                    success = request_media(
-                        media_id,
-                        selected_result["mediaType"],
-                        is_tv,
-                        requested_by=overseerr_user_id
-                    )
-                    if success:
-                        message = f"✅ *{selected_result['title']}* has been successfully requested!"
-                    else:
-                        message = f"❌ Failed to request *{selected_result['title']}*. Please try again later."
-                else:
-                    message = "No user selected. Use /settings first."
-
-                if query.message.photo:
-                    await query.edit_message_caption(caption=message, parse_mode="Markdown")
-                else:
-                    await query.edit_message_text(text=message, parse_mode="Markdown")
-        else:
-            logger.warning(f"Selected mediaId {media_id} not found in search results.")
-            await query.edit_message_text(
-                text="Selected media not found. Please try again.", parse_mode="Markdown"
-            )
-        return
-
-    # Back to results listing
     if data == "back_to_results":
-        logger.info(f"User {user_id} going back to results.")
+        logger.info(f"User {user_id} going back to search results.")
+        # Delete the current media message
         await query.message.delete()
-        sent_message = await display_results_with_buttons(query, context, results, offset=0, new_message=True)
+        sent_message = await display_results_with_buttons(
+            query, context, results, offset=0, new_message=True
+        )
         context.user_data["results_message_id"] = sent_message.message_id
         return
 
-    # Cancel the search
     if data == "cancel_search":
+        logger.info(f"User {user_id} canceled the search.")
         await cancel_search(query, context)
         return
 
-    # Report an issue
-    if data.startswith("report_"):
+    # ---------------------------------------------------------
+    # C) Handling requests for 1080p, 4K, or Both
+    # ---------------------------------------------------------
+    elif data.startswith("confirm_1080p_"):
+        media_id = int(data.split("_")[2])
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if not selected_result:
+            logger.warning(f"Media ID {media_id} not found in search results.")
+            await query.edit_message_text("Unable to find this media. Please try again.")
+            return
+
+        overseerr_user_id = context.user_data.get("overseerr_user_id")
+        if not overseerr_user_id:
+            await query.edit_message_text("No user selected. Use /settings first.")
+            return
+
+        success_1080p, message_1080p = request_media(
+            media_id=media_id,
+            media_type=selected_result["mediaType"],
+            requested_by=overseerr_user_id,
+            is4k=False
+        )
+
+        await send_request_status(query, selected_result['title'], success_1080p=success_1080p, message_1080p=message_1080p)
+        return
+
+    elif data.startswith("confirm_4k_"):
+        media_id = int(data.split("_")[2])
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if not selected_result:
+            logger.warning(f"Media ID {media_id} not found in search results.")
+            await query.edit_message_text("Unable to find this media. Please try again.")
+            return
+
+        overseerr_user_id = context.user_data.get("overseerr_user_id")
+        if not overseerr_user_id:
+            await query.edit_message_text("No user selected. Use /settings first.")
+            return
+
+        success_4k, message_4k = request_media(
+            media_id=media_id,
+            media_type=selected_result["mediaType"],
+            requested_by=overseerr_user_id,
+            is4k=True
+        )
+
+        await send_request_status(query, selected_result['title'], success_4k=success_4k, message_4k=message_4k)
+        return
+
+    elif data.startswith("confirm_both_"):
+        media_id = int(data.split("_")[2])
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if not selected_result:
+            logger.warning(f"Media ID {media_id} not found in search results.")
+            await query.edit_message_text("Unable to find this media. Please try again.")
+            return
+
+        overseerr_user_id = context.user_data.get("overseerr_user_id")
+        if not overseerr_user_id:
+            await query.edit_message_text("No user selected. Use /settings first.")
+            return
+
+        success_1080p, message_1080p = request_media(
+            media_id=media_id,
+            media_type=selected_result["mediaType"],
+            requested_by=overseerr_user_id,
+            is4k=False
+        )
+        success_4k, message_4k = request_media(
+            media_id=media_id,
+            media_type=selected_result["mediaType"],
+            requested_by=overseerr_user_id,
+            is4k=True
+        )
+
+        await send_request_status(query, selected_result['title'], success_1080p, message_1080p, success_4k, message_4k)
+        return
+
+    # ---------------------------------------------------------
+    # D) Report Issue
+    # ---------------------------------------------------------
+    elif data.startswith("report_"):
+        # e.g. "report_12" => Overseerr media id
         overseerr_media_id = int(data.split("_")[1])
         selected_result = next((r for r in results if r.get("overseerr_id") == overseerr_media_id), None)
         if selected_result:
-            context.user_data['selected_result'] = selected_result
             logger.info(
-                f"User {user_id} wants to report an issue for {selected_result['title']}, "
-                f"Overseerr ID {overseerr_media_id}."
+                f"User {user_id} wants to report an issue for {selected_result['title']} "
+                f"(Overseerr ID {overseerr_media_id})."
             )
-            issue_type_buttons = [
-                [InlineKeyboardButton(text=ISSUE_TYPES[1], callback_data=f"issue_type_1")],
-                [InlineKeyboardButton(text=ISSUE_TYPES[2], callback_data=f"issue_type_2")],
-                [InlineKeyboardButton(text=ISSUE_TYPES[3], callback_data=f"issue_type_3")],
-                [InlineKeyboardButton(text=ISSUE_TYPES[4], callback_data=f"issue_type_4")],
+            context.user_data['selected_result'] = selected_result
+
+            # Prepare the inline buttons for selecting issue type
+            issue_buttons = [
+                [InlineKeyboardButton(text=ISSUE_TYPES[1], callback_data=f"issue_type_{1}")],
+                [InlineKeyboardButton(text=ISSUE_TYPES[2], callback_data=f"issue_type_{2}")],
+                [InlineKeyboardButton(text=ISSUE_TYPES[3], callback_data=f"issue_type_{3}")],
+                [InlineKeyboardButton(text=ISSUE_TYPES[4], callback_data=f"issue_type_{4}")],
                 [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_issue")]
             ]
-            reply_markup = InlineKeyboardMarkup(issue_type_buttons)
+            reply_markup = InlineKeyboardMarkup(issue_buttons)
 
-            prompt_message = (
-                f"🛠 *Report an Issue*\n\n"
-                f"Please select the issue type for *{selected_result['title']}*:"
-            )
-
-            if query.message.photo:
-                await query.edit_message_caption(
-                    caption=prompt_message,
-                    parse_mode="Markdown",
-                    reply_markup=reply_markup,
-                )
-            else:
-                await query.edit_message_text(
-                    text=prompt_message,
-                    parse_mode="Markdown",
-                    reply_markup=reply_markup,
-                )
-        else:
-            logger.warning(f"Overseerr media ID {overseerr_media_id} not found in search results.")
-            await query.message.reply_text(
-                "Selected media not found. Please try again.",
+            await query.edit_message_caption(
+                caption=f"🛠 *Report an Issue*\n\nSelect the issue type for *{selected_result['title']}*:",
                 parse_mode="Markdown",
+                reply_markup=reply_markup,
             )
+        else:
+            logger.warning(f"No matching search result found for Overseerr ID {overseerr_media_id}.")
+            await query.edit_message_caption("Selected media not found. Please try again.")
         return
 
-    # Choosing the issue type
-    if data.startswith("issue_type_"):
-        issue_type_id = int(data.split("_")[2])
+    elif data.startswith("issue_type_"):
+        # e.g. "issue_type_2" -> issue type #2
+        try:
+            issue_type_id = int(data.split("_")[2])
+        except (IndexError, ValueError):
+            logger.warning(f"Invalid issue_type callback data: {data}")
+            await query.edit_message_caption("Invalid issue type. Please start again.")
+            return
+
         issue_type_name = ISSUE_TYPES.get(issue_type_id, "Other")
         context.user_data['reporting_issue'] = {
             'issue_type': issue_type_id,
@@ -1457,43 +1538,82 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup([[cancel_button]])
 
         selected_result = context.user_data.get('selected_result')
+        if not selected_result:
+            logger.warning("No selected_result found in context when choosing issue type.")
+            await query.edit_message_caption("No media selected. Please try reporting again.")
+            return
+
+        # Define concise example messages based on issue type
+        issue_examples = {
+            1: "- *The video freezes at 1h 10m, but audio continues.*\n"
+            "- *The quality is very bad despite selecting HD/4K.*\n"
+            "- *Episode 2, Season 5 is missing entirely.*",
+            
+            2: "- *Episode 3, Season 2 has no sound from minute 10.*\n"
+            "- *The audio is out of sync by 3 seconds.*\n"
+            "- *No sound at all in the movie after 45 minutes.*",
+            
+            3: "- *No English subtitles available for the movie.*\n"
+            "- *Subtitles are completely out of sync.*\n"
+            "- *Wrong subtitles are shown (Spanish instead of German).*",
+            
+            4: "- *Playback keeps buffering despite a stable connection.*\n"
+            "- *The wrong version of the movie is playing.*\n"
+            "- *Plex error when trying to watch.*"
+}
+
+        # Get the example text for the selected issue type, default to a generic example
+        example_text = issue_examples.get(issue_type_id, "- *Please describe the issue.*")
+
+        # Construct the message
         prompt_message = (
             f"🛠 *Report an Issue*\n\n"
             f"You selected: *{issue_type_name}*\n\n"
-            f"📋 *Please describe the issue with {selected_result['title']}.*\n"
-            "Type your message below. Provide as much detail as possible:"
+            f"📋 *Describe the issue with {selected_result['title']}.*\n"
+            "Example:\n"
+            f"{example_text}\n\n"
+            "Type your issue below:"
         )
 
-        if query.message.photo:
-            await query.edit_message_caption(
-                caption=prompt_message,
-                parse_mode="Markdown",
-                reply_markup=reply_markup,
-            )
-        else:
-            await query.edit_message_text(
-                text=prompt_message,
-                parse_mode="Markdown",
-                reply_markup=reply_markup,
+        await query.edit_message_caption(
+            caption=prompt_message,
+            parse_mode="Markdown",
+            reply_markup=reply_markup,
             )
         return
 
-    # Cancel the issue report
-    if data == "cancel_issue":
+    elif data == "cancel_issue":
+        logger.info(f"User {user_id} canceled the issue reporting process.")
         context.user_data.pop('reporting_issue', None)
         selected_result = context.user_data.get('selected_result')
-        logger.info(f"User {user_id} canceled issue reporting.")
-        if selected_result:
-            await process_user_selection(query, context, selected_result, edit_message=True)
-        else:
-            await query.message.reply_text("Issue reporting canceled.")
+        # Return to the media details
+        await process_user_selection(query, context, selected_result, edit_message=True)
         return
 
-    # Fallback for unknown callback data
+    # ---------------------------------------------------------
+    # E) Fallback
+    # ---------------------------------------------------------
     logger.warning(f"User {user_id} triggered unknown callback data: {data}")
     await query.edit_message_text(
-        text="Invalid action. Please try again.", parse_mode="Markdown"
+        text="Invalid action or unknown callback data. Please try again.",
+        parse_mode="Markdown"
     )
+
+async def send_request_status(query, title, success_1080p=None, message_1080p=None, success_4k=None, message_4k=None):
+    """
+    Sends a formatted status message for a media request.
+    Handles 1080p, 4K, or both in a unified way.
+    """
+    status_1080p = "✅ 1080p requested successfully" if success_1080p else f"❌ 1080p: {message_1080p}" if message_1080p else "❌ 1080p request failed"
+    status_4k = "✅ 4K requested successfully" if success_4k else f"❌ 4K: {message_4k}" if message_4k else "❌ 4K request failed"
+
+    msg = f"*Request Status for {title}:*\n"
+    if success_1080p is not None:
+        msg += f"• {status_1080p}\n"
+    if success_4k is not None:
+        msg += f"• {status_4k}\n"
+
+    await query.edit_message_caption(msg.strip(), parse_mode="Markdown")
 
 ###############################################################################
 #                HANDLE CHANGE USER FUNCTION
