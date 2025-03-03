@@ -193,7 +193,7 @@ services:
 	  OVERSEERR_API_URL: "http://your-overseerr-ip:5055/api/v1"
 	  OVERSEERR_API_KEY: "your_overseerr_api_key"
 	  TELEGRAM_TOKEN: "your_telegram_token"
-	  PASSWORD: "your_password" # or "" for no access control
+	  PASSWORD: "your_password"
 	volumes:
 	  - ./data:/app/data
 	restart: unless-stopped
