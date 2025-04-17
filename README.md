@@ -24,6 +24,10 @@ The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr 
 
 ![1 Start](https://github.com/user-attachments/assets/55cc4796-7a4f-4909-a260-0395e7fb202a)
 
+![4](https://github.com/user-attachments/assets/bb810a4c-030b-4609-a44f-adeb8ab2dd8f)
+![grafik](https://github.com/user-attachments/assets/64b9af28-ee2b-4d9d-ac83-28c45b62a815)
+
+
 ---
 
 ## Installation
@@ -110,6 +114,9 @@ From media details returned by `/check`, users can report issues for pending or 
 - Other playback problems
 
 Reports are submitted to Overseerr, with attribution based on the operation mode (individual user in Normal Mode, admin in API Mode, shared account in Shared Mode).
+
+![6 Problem](https://github.com/user-attachments/assets/1928ca18-0e27-4de6-a78f-a285f7c0f0f4)
+![7 Problem](https://github.com/user-attachments/assets/8cb1322e-4b32-4b44-8873-65f6a9e6b471)
 
 ---
 
