@@ -1,226 +1,151 @@
-# Overseerr Telegram Bot ![Logo32](https://github.com/user-attachments/assets/4344ff43-92a4-4834-8485-620756ba8a90)
+# Overseerr Telegram Bot
 
-A phyton script to request media via a Telegram bot via Overseerr 
+The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr instance through Telegram. Search for movies and TV shows, check availability, request new titles, report issues, and manage notifications—all from your Telegram chat. With flexible operation modes, admin controls, and optional password protection, the bot is designed for both individual and group use, making media management effortless.
 
+📚 **Detailed Documentation**: Explore the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki) for comprehensive guides on setup, configuration, and advanced usage.
 
-The **Overseerr Telegram Bot** bridges your Telegram account with Overseerr, enabling you to request movies and TV shows directly within Telegram.
+🐳 **Docker Image**: Pull the latest bot image from [Docker Hub](https://hub.docker.com/r/chimpanzeesweetrolls/overseerrrequestviatelegrambot).
 
-### 🌟 Features
+---
 
-- **🔍 Simple Search** - Quickly search for movies and series
-- **📥 Easy Requests** - Submit media requests with just a few taps
-- **🛠 Issue Reporting** - Report any issues or problems
-- **📊 Check Availability** – See if a movie or show is already in your library, pending approval, or being processed
-- **🔔 Get Notified** – Get notification updates for your requests 
-- **👥 User Management** - Multi-user support to share the bot with friends
-- **👌 User-Friendly** - Intuitive and easy to use, ensuring a seamless media management experience
-- **🔒 Access Control** – Set up a password to restrict access
+## Features
 
-
-## How to use
-1. Open a chat with your Telegram bot
-2. /start
-3. /check MOVIE / TV-Show
+- **Media Search**: Use `/check <title>` to find movies or TV shows (e.g., `/check The Matrix`) and view detailed results, including posters and availability.
+- **Availability Check**: Instantly see if a title is available in HD (1080p) or 4K, based on your Overseerr library.
+- **Title Requests**: Request missing titles in HD, 4K, or both, respecting Overseerr user permissions for quality settings.
+- **Issue Reporting**: Report issues like video glitches, audio sync problems, missing subtitles, or other playback errors for existing titles.
+- **Notification Management**: Customize Telegram notifications for Overseerr events (e.g., request approvals, media availability) with options to enable/disable or use silent mode.
+- **Admin Controls**: Admins can switch operation modes, toggle Group Mode, create new Overseerr users, and manage bot settings via an intuitive menu.
+- **Password Protection**: Secure bot access with an optional password, ensuring only authorized users can interact.
+- **Group Mode**: Restrict bot usage to a specific Telegram group or thread, ideal for collaborative media management in shared environments like family or friend groups.
 
 > [!Note]
-> The language of the media titles and descriptions will match the language setting configured in Overseerr.
+> The language of media titles and descriptions matches the language setting configured in Overseerr (e.g., German titles and descriptions if Overseerr is set to German), while the bot's interface remains in English.
 
-![2 7 - 1](https://github.com/user-attachments/assets/98a53f45-dff1-4d0f-8195-d02f0fe28cd1)
+![1 Start](https://github.com/user-attachments/assets/55cc4796-7a4f-4909-a260-0395e7fb202a)
 
-![2 7 - 4](https://github.com/user-attachments/assets/7b66b137-b7e9-4cbc-b6c0-a008e3d35897)
-![2 7 - 3](https://github.com/user-attachments/assets/f406b8f8-1f0c-4929-b5fa-32826ecebea0)
+*Example of searching and requesting media with `/check`.*
 
-![2 7 - 7](https://github.com/user-attachments/assets/554aa8e3-ef51-40d3-9b3f-2f628c44693b)
-![2 1 - 4](https://github.com/user-attachments/assets/000d286f-b0ac-4ebe-b6bb-9b66fa619da8)
-
-![2 7 - 8](https://github.com/user-attachments/assets/e5600e44-3766-4df7-a3c1-2330fcb4d6d2)
-
-
-## Update on Ubuntu / Linux
-```bash
-cd OverseerrRequestViaTelegramBot
-git pull
-```
+---
 
 ## Installation
 
-### Create a Telegram Bot
+For detailed installation instructions, refer to the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki):
 
-Follow the instructions at [Telegram Bots: How do I create a bot?](https://core.telegram.org/bots#how-do-i-create-a-bot) to create a new Telegram bot. After creating the bot, you'll receive a bot token. Keep this token secure, as it will be needed later.
-
-![image](https://github.com/user-attachments/assets/1a034159-2ba2-4573-948e-b4c643b87fa7)
-
-
-### get overseerr API_KEY
-Obtain your Overseerr API key from your Overseerr instance settings.
-
-![image](https://github.com/user-attachments/assets/b612cfc3-baa9-49ad-96e2-4de8f9ebecde)
-
-
-
-### Installation on Ubuntu / Linux (without Docker)
-
-> [!Note]
-> If you prefer to install using Docker, please refer to the section [Installation with Docker](#installation-with-docker).  
+- **Ubuntu (Source Installation)**: Follow the guide at [Installation on Ubuntu](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#4-installation-on-ubuntu).
+- **Docker**: Deploy with Docker or Docker Compose using the instructions at [Installation with Docker](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#5-installation-with-docker).
 
 ---
 
-## 1. Prerequisites
+## Operation Modes
 
-Ensure the following are installed on your system:
+The bot supports three operation modes, configurable by the admin via `/settings`, catering to different use cases:
 
-- **Python 3.12.x** or newer  
-- **pip** (Python's package manager)  
-- **git** (for cloning the repository)
+- **Normal Mode**:
 
-Install them using the following commands:
+  - Users log in with their individual Overseerr credentials (email and password).
+  - Requests and issue reports are tied to each user’s Overseerr account, ensuring personalized tracking.
+  - Ideal for users with their own Overseerr accounts who want full control over their requests and notifications.
+  - Example: A user logs in to request "Inception" in 4K, and notifications about its availability are sent only to their Telegram chat.
 
-```bash
-sudo apt update
-sudo apt install python3 python3-pip git
-```
+- **API Mode**:
 
----
+  - Users select an existing Overseerr user from a list without needing credentials, using the Overseerr API key for requests.
+  - Simplifies access for users without Overseerr accounts, with requests automatically approved by Overseerr.
+  - Issue reports are attributed to the admin’s account due to API key usage.
+  - Best for environments where quick access is prioritized over individual account management.
+  - Example: A user selects "Guest" from the Overseerr user list to request "Stranger Things," bypassing login.
 
-## 2. Download and Set Up the Bot
+- **Shared Mode**:
 
-1. Clone the repository and navigate to the bot's directory:
+  - All users share a single Overseerr account configured by the admin, streamlining group usage.
+  - The admin logs in once, and all requests and issue reports use this shared account.
+  - Perfect for small groups (e.g., families or friends) sharing a media server, with notifications sent to a common Telegram chat.
+  - Example: A family uses one Overseerr account to request "Frozen" in HD, with updates sent to their shared Telegram group.
 
-    ```bash
-    git clone https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot.git
-    cd OverseerrRequestViaTelegramBot
-    ```
-
-2. Ensure you have all required Python dependencies installed. They are listed in `requirements.txt`. Install them using:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
+Learn more about configuring modes in the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
 
 ---
 
-## 3. Configure the Bot
+## Commands and Usage
 
-Rename the configuration template and update it with your actual values:
+### User Commands
 
-```bash
-mv config_template.py config.py
-nano config.py
-```
+- `/start`: Initializes the bot, displaying a welcome message with the bot’s version and prompting for a password (if enabled). Guides users to log in or select a user, depending on the mode.
+- `/check <title>`: Searches Overseerr for movies or TV shows (e.g., `/check Breaking Bad`). Returns a paginated list with details, availability, and options to request or report issues.
+- `/settings`: Opens a menu to manage Overseerr account settings or notifications:
+  - In Normal Mode: Log in with credentials.
+  - In API Mode: Select an Overseerr user.
+  - In Shared Mode: Only admins can access; regular users rely on the shared account.
 
+![Settings Menu Screenshot](https://example.com/overseerr-bot-settings.png)
+*Example of the `/settings` menu for managing notifications.*
 
-``` python
-# config.py
+### Admin Controls
 
-OVERSEERR_API_URL = 'http://YOUR_IP_ADDRESS:5055/api/v1' # Replace with your Overseerr URL
-OVERSEERR_API_KEY = 'YOUR_OVERSEERR_API_KEY'             # Replace with your API key
-TELEGRAM_TOKEN = 'YOUR_TELEGRAM_TOKEN'                   # Replace with your Telegram bot token
+Admins access additional options via `/settings`:
 
-# Access Control Configuration (Optional)
-# Set a password to protect access. If empty, no access control is applied.
-PASSWORD = "your-secure-password"  # or "" for no access control
-```
+- **Toggle Group Mode**: Restrict bot interactions to a specific Telegram group or thread for centralized communication.
+- **Change Operation Mode**: Switch between Normal, API, and Shared Mode to suit your setup.
+- **Create New User**: Add new Overseerr users by providing an email and username, streamlining user management.
+- **Login/Logout**: Manage sessions (admin-only in Shared Mode).
 
----
-
-## 4. Run the Bot Manually (Optional)
-
-To verify that everything works correctly, you can run the bot manually:
-
-```bash
-python3 telegram_overseerr_bot.py
-```
+For detailed command usage, see the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
 
 ---
 
-## 5. Run the Bot as a Service (Recommended)
+## Managing Notifications
 
-To ensure the bot starts automatically at boot, create a **systemd service**:
+Users can configure Overseerr Telegram notifications via `/settings`:
 
-1. Open a new service file:
+- **Enable/Disable Notifications**: Turn on/off notifications for events like request approvals, media availability, or errors.
+- **Silent Mode**: Opt for silent notifications without sound, ideal for minimizing disruptions during quiet hours.
+- In Shared Mode, only admins configure notifications for the shared account, applying to all users.
 
-	```bash
-	sudo nano /etc/systemd/system/telegram_bot.service
-	```
+Example: Enable notifications to receive a Telegram message when "The Witcher" becomes available, or set silent mode for nighttime updates.
 
-2. Add the following configuration (replace paths and username as needed):
+---
 
-	```ini
-	[Unit]
-	Description=Overseerr Telegram Bot
-	After=network.target
-	
-	[Service]
-	Type=simple
-	ExecStartPre=/bin/sleep 10
-	ExecStart=/usr/bin/python3 /path/to/your/script.py   #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot/telegram_overseerr_bot.py
-	WorkingDirectory=/path/to/your/script-directory      #e.g. /home/USERNAME/OverseerrRequestViaTelegramBot
-	Restart=always
-	User=your-username
-	Environment=PYTHONUNBUFFERED=1
-	
-	[Install]
-	WantedBy=multi-user.target
-	
-	```
+## Reporting Issues
 
-3. Save and exit the file (`Ctrl+O`, `Enter`, `Ctrl+X`).
-4. Reload systemd to apply changes, Enable and start the service
+From media details returned by `/check`, users can report issues for pending or available titles, such as:
 
-	```
-	sudo systemctl daemon-reload
-	sudo systemctl enable telegram_bot.service
-	sudo systemctl start telegram_bot.service
-	```
+- Video issues (e.g., pixelation, buffering)
+- Audio issues (e.g., out-of-sync, missing tracks)
+- Subtitle issues (e.g., incorrect timing, missing files)
+- Other playback problems
 
-6. Check the service status to ensure it’s running:
+Reports are submitted to Overseerr, with attribution based on the operation mode (individual user in Normal Mode, admin in API Mode, shared account in Shared Mode).
 
-	```bash
-	sudo systemctl status telegram_bot.service
-	```
+---
 
-## Installation with Docker
+## Group Mode
 
-Our [Docker Hub](https://hub.docker.com/repository/docker/chimpanzeesweetrolls/overseerrrequestviatelegrambot/general)
+Group Mode enhances collaborative usage by restricting bot interactions to a designated Telegram group or thread:
 
-### docker-compose.yml
-```
-version: "3.9" # Specifies the version of the Docker Compose file format
-services:
-  telegram-bot: # The name of the service (container)
-	image: chimpanzeesweetrolls/overseerrrequestviatelegrambot:latest
-	environment:
-	  OVERSEERR_API_URL: "http://your-overseerr-ip:5055/api/v1"
-	  OVERSEERR_API_KEY: "your_overseerr_api_key"
-	  TELEGRAM_TOKEN: "your_telegram_token"
-	  PASSWORD: "your_password"
-	volumes:
-	  - ./data:/app/data
-	restart: unless-stopped
-```
+- **Enable Group Mode**: Only the admin can activate this via `/settings`, storing the setting in `data/bot_config.json`.
+- **Set Primary Chat**: Running `/start` in a group or thread sets it as the primary chat, identified by `primary_chat_id`.
+- **Usage**: When active, all commands (`/start`, `/check`) and notifications are confined to the primary chat/thread, ignoring other chats. This ensures a unified experience for group members.
+- **Example**: In a family Telegram group, users request "Toy Story" via `/check`, and the bot responds only in that group, with notifications (e.g., “Toy Story is available”) sent to all members.
+- **Use Case**: Ideal for shared media servers (e.g., Plex) where a group collaborates on requests, keeping communication centralized.
 
-### Without compose:
-```
-docker run -d \
-    --name telegram-bot \
-    -v $(pwd)/data:/app/data \ 
-    -e OVERSEERR_API_URL="http://your-overseerr-ip:5055/api/v1" \ 
-    -e OVERSEERR_API_KEY="your_overseerr_api_key" \ 
-    -e TELEGRAM_TOKEN="your_telegram_token" \ 
-    -e PASSWORD="your_password" \
-    chimpanzeesweetrolls/overseerrrequestviatelegrambot:latest
-```
+![Group Mode Screenshot](https://example.com/overseerr-bot-group-mode.png)
+*Example of Group Mode restricting interactions to a Telegram group.*
 
-### NAS GUI (QNAP as an example, other manufacturers should be similar)
+For setup details, visit the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
 
-![1](https://github.com/user-attachments/assets/2fa3d40f-5be4-45b7-b61c-b3b8645340a4)
-![2](https://github.com/user-attachments/assets/79601018-ed27-41b9-87e1-69a5b9cd0f1b)
-![3](https://github.com/user-attachments/assets/9528cec9-a2e8-4e44-a710-39e002fa084b)
-![4](https://github.com/user-attachments/assets/88979017-e7a0-4877-b288-6044e52e2352)
-![5](https://github.com/user-attachments/assets/612827f4-50c1-4ac8-8819-a083906eaa82)
-![6](https://github.com/user-attachments/assets/35330e3d-a9a6-484a-9fda-3edb36aa59d9)
-![7](https://github.com/user-attachments/assets/a35b5b52-b1ef-48dd-973d-3292c348a0ca)
-![8](https://github.com/user-attachments/assets/b9d5a621-28f4-43d5-b78c-73178fe883fe)
-![9](https://github.com/user-attachments/assets/dd2c98bc-7028-49b5-aa19-33e0d8c13939)
+---
 
+## FAQ and Troubleshooting
 
+- **How do I set up the bot for the first time?**\
+  Follow the installation guides in the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki) for Ubuntu or Docker.
+
+- **What if I forget the bot password?**\
+  The password is set via the `PASSWORD` environment variable or `config.py`. Admins can reset it by updating the configuration. See the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki) for details.
+
+- **Why can’t I request 4K titles?**\
+  4K requests depend on Overseerr permissions:
+
+  - Normal Mode: Tied to the user’s account permissions.
+  - API Mode: Tied to the selected Overse
