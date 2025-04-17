@@ -24,8 +24,6 @@ The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr 
 
 ![1 Start](https://github.com/user-attachments/assets/55cc4796-7a4f-4909-a260-0395e7fb202a)
 
-*Example of searching and requesting media with `/check`.*
-
 ---
 
 ## Installation
@@ -46,7 +44,6 @@ The bot supports three operation modes, configurable by the admin via `/settings
   - Users log in with their individual Overseerr credentials (email and password).
   - Requests and issue reports are tied to each user’s Overseerr account, ensuring personalized tracking.
   - Ideal for users with their own Overseerr accounts who want full control over their requests and notifications.
-  - Example: A user logs in to request "Inception" in 4K, and notifications about its availability are sent only to their Telegram chat.
 
 - **API Mode**:
 
@@ -54,14 +51,12 @@ The bot supports three operation modes, configurable by the admin via `/settings
   - Simplifies access for users without Overseerr accounts, with requests automatically approved by Overseerr.
   - Issue reports are attributed to the admin’s account due to API key usage.
   - Best for environments where quick access is prioritized over individual account management.
-  - Example: A user selects "Guest" from the Overseerr user list to request "Stranger Things," bypassing login.
 
 - **Shared Mode**:
 
   - All users share a single Overseerr account configured by the admin, streamlining group usage.
   - The admin logs in once, and all requests and issue reports use this shared account.
   - Perfect for small groups (e.g., families or friends) sharing a media server, with notifications sent to a common Telegram chat.
-  - Example: A family uses one Overseerr account to request "Frozen" in HD, with updates sent to their shared Telegram group.
 
 Learn more about configuring modes in the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
 
@@ -78,8 +73,7 @@ Learn more about configuring modes in the [Wiki](https://github.com/LetsGoDude/O
   - In API Mode: Select an Overseerr user.
   - In Shared Mode: Only admins can access; regular users rely on the shared account.
 
-![Settings Menu Screenshot](https://example.com/overseerr-bot-settings.png)
-*Example of the `/settings` menu for managing notifications.*
+![2 settings](https://github.com/user-attachments/assets/1ab4f5a4-04af-4947-82c0-847988b9fc57)
 
 ### Admin Controls
 
@@ -128,9 +122,6 @@ Group Mode enhances collaborative usage by restricting bot interactions to a des
 - **Usage**: When active, all commands (`/start`, `/check`) and notifications are confined to the primary chat/thread, ignoring other chats. This ensures a unified experience for group members.
 - **Example**: In a family Telegram group, users request "Toy Story" via `/check`, and the bot responds only in that group, with notifications (e.g., “Toy Story is available”) sent to all members.
 - **Use Case**: Ideal for shared media servers (e.g., Plex) where a group collaborates on requests, keeping communication centralized.
-
-![Group Mode Screenshot](https://example.com/overseerr-bot-group-mode.png)
-*Example of Group Mode restricting interactions to a Telegram group.*
 
 For setup details, visit the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
 
