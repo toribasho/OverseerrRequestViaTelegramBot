@@ -29,10 +29,10 @@ The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr 
 
 ## Installation
 
-For detailed installation instructions, refer to the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki):
+For detailed installation instructions, refer to the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#installation):
 
-- **Ubuntu (Source Installation)**: Follow the guide at [Installation on Ubuntu](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#4-installation-on-ubuntu).
-- **Docker**: Deploy with Docker or Docker Compose using the instructions at [Installation with Docker](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#5-installation-with-docker).
+- **Ubuntu (Source Installation)**: Follow the guide at [Installation on Ubuntu](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#source-installation-ubuntulinux).
+- **Docker**: Deploy with [Docker](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#docker-installation-without-compose), [Docker Compose](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#docker-installation-with-compose) or [NAS Container](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#nas-container-setup) using the instructions at the wiki.
 
 ---
 
@@ -59,7 +59,7 @@ The bot supports three operation modes, configurable by the admin via `/settings
   - The admin logs in once, and all requests and issue reports use this shared account.
   - Perfect for small groups (e.g., families or friends) sharing a media server, with notifications sent to a common Telegram chat.
 
-Learn more about configuring modes in the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
+Learn more about configuring modes in the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#operation-modes).
 
 ---
 
@@ -150,7 +150,7 @@ Group Mode enhances collaborative usage by restricting bot interactions to a des
 - **Example**: In a family Telegram group, users request "Toy Story" via `/check`, and the bot responds only in that group, with notifications (e.g., “Toy Story is available”) sent to all members.
 - **Use Case**: Ideal for shared media servers (e.g., Plex) where a group collaborates on requests, keeping communication centralized.
 
-For setup details, visit the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki).
+For setup details, visit the [Wiki](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#group-mode).
 
 ---
 
