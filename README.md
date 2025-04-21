@@ -108,7 +108,7 @@ All admin actions are performed via the `/settings` menu:
 - **Login/Logout (Shared Mode)**: Admins manage the shared Overseerr account login.
 
 ![2 settings](https://github.com/user-attachments/assets/7ecd389c-e931-42a4-bcec-c5c45fe4029b)
-![3 settings - User Management](https://github.com/user-attachments/assets/e0a49e74-1213-43ab-918e-45dbeaf7785d)
+![3 settings - User Management](https://github.com/user-attachments/assets/95c6d9fd-eb3d-44ed-8b5a-eb7e43c1eb22)
 
 ---
 
