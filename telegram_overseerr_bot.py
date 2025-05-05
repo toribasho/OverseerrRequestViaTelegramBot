@@ -1,12 +1,12 @@
 import logging
-import base64 # For secure storage of login data
+import base64
 import requests
 import urllib.parse
 import json
 import os
 from enum import Enum
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from telegram import (
     Update,
@@ -26,8 +26,8 @@ from telegram.ext import (
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
-VERSION = "3.0.0"
-BUILD = "2025.04.20.245"
+VERSION = "3.0.1"
+BUILD = "2025.05.05.260"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -113,7 +113,6 @@ def load_config():
     Loads the configuration from data/bot_config.json.
     Returns a dict with default values if the file is missing or invalid.
     """
-    ensure_data_directory()
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -222,7 +221,6 @@ def save_config(config):
     Saves the configuration to data/bot_config.json.
     Ensures the directory exists before writing.
     """
-    ensure_data_directory()
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
@@ -239,7 +237,6 @@ def load_user_sessions():
 
 def save_user_session(telegram_telegram_user_id: int, session_data: dict):
     """Save a user's session data to a JSON file for Normal mode."""
-    ensure_data_directory()
     try:
         # Load existing sessions if file exists
         try:
@@ -262,7 +259,6 @@ def save_user_session(telegram_telegram_user_id: int, session_data: dict):
 
 def load_user_session(telegram_user_id: int) -> dict | None:
     """Load a user's session data from the JSON file."""
-    ensure_data_directory()
     try:
         with open(USER_SESSIONS_FILE, "r", encoding="utf-8") as f:
             all_sessions = json.load(f)
@@ -271,7 +267,6 @@ def load_user_session(telegram_user_id: int) -> dict | None:
         return None
 
 def save_user_sessions(sessions):
-    ensure_data_directory()
     with open(USER_SESSIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(sessions, f, indent=2)
     logger.info("Saved user sessions")
@@ -284,14 +279,12 @@ def load_shared_session():
         return None
 
 def save_shared_session(session_data):
-    ensure_data_directory()
     with open(SHARED_SESSION_FILE, "w", encoding="utf-8") as f:
         json.dump(session_data, f, indent=2)
     logger.info("Saved shared session")
 
 def clear_shared_session():
     """Clear the shared session data."""
-    ensure_data_directory()
     if os.path.exists(SHARED_SESSION_FILE):
         os.remove(SHARED_SESSION_FILE)
         logger.info("Cleared shared session")
@@ -574,7 +567,6 @@ def create_issue(media_id: int, media_type: str, issue_description: str, issue_t
             logger.error(f"Response content: {e.response.text}")
         return False
 
-
 ###############################################################################
 #          get_latest_version_from_github: CHECK FOR UPDATES (OPTIONAL)
 ###############################################################################
@@ -704,31 +696,35 @@ async def enable_global_telegram_notifications(update: Update, context: ContextT
     else:
         logger.error("Could not retrieve Global Telegram notification settings.")
 
-
 async def start_login(update_or_query: Update | CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """Initiates login, deleting the settings menu and cleaning up prompts."""
     if isinstance(update_or_query, Update):
-        telegram_telegram_user_id = update_or_query.effective_user.id
+        telegram_user_id = update_or_query.effective_user.id
         message = update_or_query.message
     else:  # CallbackQuery
-        telegram_telegram_user_id = update_or_query.from_user.id
+        telegram_user_id = update_or_query.from_user.id
         message = update_or_query.message
 
-    logger.info(f"User {telegram_telegram_user_id} started login process.")
+    logger.info(f"User {telegram_user_id} started login process.")
 
     # Check mode restrictions
     if CURRENT_MODE == BotMode.API:
         await message.reply_text("In API Mode, no login is required.")
         return
-    if CURRENT_MODE == BotMode.SHARED and telegram_telegram_user_id != load_config()["admin_telegram_id"]:
-        await message.reply_text("In Shared Mode, only the admin can log in.")
-        return
+
+    if CURRENT_MODE == BotMode.SHARED:
+        config = load_config()
+        user_id_str = str(telegram_user_id)
+        user = config["users"].get(user_id_str, {})
+        if not user.get("is_admin", False):
+            await message.reply_text("In Shared Mode, only admins can log in.")
+            return
 
     # Delete the settings menu if this is a callback query
     if isinstance(update_or_query, CallbackQuery):
         try:
             await message.delete()
-            logger.info(f"Deleted settings menu message for user {telegram_telegram_user_id} during login.")
+            logger.info(f"Deleted settings menu message for user {telegram_user_id} during login.")
         except Exception as e:
             logger.warning(f"Failed to delete settings menu message: {e}")
 
@@ -761,7 +757,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "is_authorized": user.get("is_authorized", False),
             "is_blocked": user.get("is_blocked", False),
             "is_admin": user.get("is_admin", False),
-            "created_at": user.get("created_at", datetime.utcnow().isoformat() + "Z")
+            "created_at": user.get("created_at", datetime.now(timezone.utc).isoformat() + "Z")
         }
         save_config(config)
 
@@ -841,7 +837,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "is_authorized": True,
                     "is_blocked": False,
                     "is_admin": is_admin,
-                    "created_at": datetime.utcnow().isoformat() + "Z"
+                    "created_at": datetime.now(timezone.utc).isoformat() + "Z"
                 }
                 save_config(config)
                 logger.info(f"User {telegram_user_id} added to users with authorized status")
@@ -965,7 +961,7 @@ async def show_user_management_menu(update_or_query, context: ContextTypes.DEFAU
     if not users:
         text = "👥 *User Management*\n\nNo users found."
         keyboard = [
-            [InlineKeyboardButton("➕ Create New User", callback_data="create_user")],
+            [InlineKeyboardButton("➕ Create new Overseerr User", callback_data="create_user")],
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="back_to_settings")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -986,7 +982,7 @@ async def show_user_management_menu(update_or_query, context: ContextTypes.DEFAU
         button_text = f"{user['username']} (ID: {user['telegram_id']}) - {status}"
         keyboard.append([InlineKeyboardButton(button_text, callback_data=f"manage_user_{user['telegram_id']}")])
 
-    keyboard.append([InlineKeyboardButton("➕ Create New User", callback_data="create_user")])
+    keyboard.append([InlineKeyboardButton("➕ Create new Overseerr User", callback_data="create_user")])
 
     navigation_buttons = []
     if offset > 0:
@@ -1091,25 +1087,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "is_authorized": True,
             "is_blocked": False,
             "is_admin": True,
-            "created_at": "2025-04-20T12:00:00Z"
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z"
         }
         save_config(config)
         logger.info(f"Set user {telegram_user_id} as admin")
 
     await enable_global_telegram_notifications(update, context)
-
-    # Set first user as admin if no admin exists
-    user_id_str = str(telegram_user_id)
-    if not any(user.get("is_admin", False) for user in config["users"].values()):
-        config["users"][user_id_str] = {
-            "username": update.effective_user.username or update.effective_user.full_name,
-            "is_authorized": True,
-            "is_blocked": False,
-            "is_admin": True,
-            "created_at": datetime.utcnow().isoformat() + "Z"
-        }
-        save_config(config)
-        logger.info(f"Set user {telegram_user_id} as admin")
 
     # Version check
     latest_version = get_latest_version_from_github()
@@ -1284,7 +1267,9 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
     else:
         await update_or_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
     
-
+########################################################################
+#                    /settings COMMAND
+########################################################################
 async def show_manage_notifications_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE):
     """
     Displays a menu letting the user toggle:
@@ -1907,13 +1892,6 @@ async def cancel_search(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
         parse_mode="Markdown"
     )
 
-ISSUE_TYPES = {
-    1: "Video",
-    2: "Audio",
-    3: "Subtitle",
-    4: "Other"
-}
-
 async def mode_select(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """
     Displays a detailed mode selection menu with descriptions for each mode.
@@ -2067,7 +2045,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     elif data == "create_user":
-        logger.info(f"User {telegram_user_id} clicked 'Create New Overseerr User'.")
+        logger.info(f"User {telegram_user_id} clicked 'Create new Overseerr User'.")
         context.user_data["creating_new_user"] = True
         context.user_data["new_user_data"] = {}
         context.user_data["create_user_message_id"] = query.message.message_id
@@ -2076,7 +2054,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             text=(
-                "➕ *Create New User*\n\n"
+                "➕ *Create new Overseerr User*\n\n"
                 "Step 1: Please enter the user's email address."
             ),
             parse_mode="Markdown",
@@ -2439,7 +2417,6 @@ async def send_request_status(query, title, success_1080p=None, message_1080p=No
 
     await query.edit_message_caption(msg.strip(), parse_mode="Markdown")
 
-
 ###############################################################################
 #                HANDLE CHANGE USER FUNCTION
 ###############################################################################
@@ -2520,13 +2497,13 @@ async def handle_change_user(update_or_query, context: ContextTypes.DEFAULT_TYPE
         await send_message(context, chat_id, message_text, reply_markup=reply_markup, message_thread_id=message_thread_id)
     elif isinstance(update_or_query, CallbackQuery):
         await update_or_query.edit_message_text(message_text, parse_mode="Markdown", reply_markup=reply_markup)
-        
 
 ###############################################################################
 #                               MAIN ENTRY POINT
 ###############################################################################
 def main():
     global CURRENT_MODE
+    ensure_data_directory()
     config = load_config()
     mode_from_config = config.get("mode", "normal")
     try:

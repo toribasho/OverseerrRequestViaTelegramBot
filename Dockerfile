@@ -1,10 +1,19 @@
-FROM python:3.9-slim-buster
+# Use a lightweight Python base image
+FROM python:3.11-slim
 
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements file and install dependencies
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY . .
+# Copy application code
+COPY . /app
 
+# Create a non-root user for security
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Run the beta script
 CMD ["python", "telegram_overseerr_bot.py"]
