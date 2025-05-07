@@ -26,8 +26,8 @@ from telegram.ext import (
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
-VERSION = "3.0.1"
-BUILD = "2025.05.05.260"
+VERSION = "3.0.2"
+BUILD = "2025.05.08.261"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -496,6 +496,9 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
     if requested_by is not None:  # Only in API Mode
         payload["userId"] = requested_by
     
+    if media_type == "tv":
+        payload["seasons"] = "all"
+
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
         headers["Cookie"] = f"connect.sid={session_cookie}"
