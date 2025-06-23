@@ -497,7 +497,7 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
         payload["userId"] = requested_by
     
     if media_type == "tv":
-        payload["seasons"] = "all"
+        payload["seasons"] = "first"
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
