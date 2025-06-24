@@ -398,6 +398,25 @@ def search_media(media_name: str):
         logger.error(f"Error during media search: {e}")
         return None
 
+def get_tv_details(media_id: int, session_cookie: str):
+    """
+    Get tv details by id from Overseerr.
+    Returns the JSON result or None on error.
+    """
+    try:
+        logger.info(f"Get seasons detail for _id: {media_id}")
+        url = f"{OVERSEERR_API_URL}/tv/{media_id}"
+        response = requests.get(
+            url,
+            headers={"Cookie": f"connect.sid={session_cookie}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logger.error(f"Error during media search: {e}")
+        return None        
+
 def process_search_results(results: list):
     """
     Process Overseerr search results into a simplified list of dicts.
@@ -491,13 +510,18 @@ def check_session_validity(session_cookie: str) -> bool:
 ###############################################################################
 #              OVERSEERR API: REQUEST & ISSUE CREATION
 ###############################################################################
-def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None) -> tuple[bool, str]:
+def request_media(media_id: int, media_type: str, season_index: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None) -> tuple[bool, str]:
     payload = {"mediaType": media_type, "mediaId": media_id, "is4k": is4k}
     if requested_by is not None:  # Only in API Mode
         payload["userId"] = requested_by
     
     if media_type == "tv":
-        payload["seasons"] = "first"
+        if season_index == "all":
+            payload["seasons"] = "all"
+        else:
+            season_ar = []
+            season_ar.append(int(season_index))
+            payload["seasons"] = season_ar
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
@@ -1728,6 +1752,10 @@ async def process_user_selection(
     def can_request_resolution(code: int) -> bool:
         return code not in REQUESTED_STATUSES
 
+    str_appendix="confirm"
+    if result["mediaType"] == "tv":
+        str_appendix="sselect"
+
     # Build the inline keyboard
     keyboard = []
     back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
@@ -1735,15 +1763,15 @@ async def process_user_selection(
     # Build request_buttons list
     request_buttons = []
     if can_request_resolution(status_hd):
-        btn_1080p = InlineKeyboardButton("📥 1080p", callback_data=f"confirm_1080p_{result['id']}")
+        btn_1080p = InlineKeyboardButton("📥 1080p", callback_data=f"{str_appendix}_1080p_{result['id']}")
         request_buttons.append(btn_1080p)
 
     if user_has_4k_permission and can_request_resolution(status_4k):
-        btn_4k = InlineKeyboardButton("📥 4K", callback_data=f"confirm_4k_{result['id']}")
+        btn_4k = InlineKeyboardButton("📥 4K", callback_data=f"{str_appendix}_4k_{result['id']}")
         request_buttons.append(btn_4k)
 
     if user_has_4k_permission and can_request_resolution(status_hd) and can_request_resolution(status_4k):
-        btn_both = InlineKeyboardButton("📥 Both", callback_data=f"confirm_both_{result['id']}")
+        btn_both = InlineKeyboardButton("📥 Both", callback_data=f"{str_appendix}_both_{result['id']}")
         request_buttons.append(btn_both)
 
     # Adjust labels if exactly two buttons are present
@@ -2228,6 +2256,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("confirm_"):
         media_id = int(data.split("_")[2])
         selected_result = next((r for r in results if r["id"] == media_id), None)
+        season_index = season_index = data.split("_")[3] if selected_result["mediaType"] == "tv" else ""
         if not selected_result:
             logger.warning(f"Media ID {media_id} not found in search results.")
             await query.edit_message_text("Unable to find this media. Please try again.")
@@ -2268,6 +2297,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_1080p, message_1080p = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
+                season_index=season_index,
                 requested_by=requested_by,
                 is4k=False,
                 session_cookie=session_cookie
@@ -2277,6 +2307,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_4k, message_4k = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
+                season_index=season_index,
                 requested_by=requested_by,
                 is4k=True,
                 session_cookie=session_cookie
@@ -2286,6 +2317,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_1080p, message_1080p = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
+                season_index=season_index,
                 requested_by=requested_by,
                 is4k=False,
                 session_cookie=session_cookie
@@ -2293,6 +2325,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_4k, message_4k = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
+                season_index=season_index,
                 requested_by=requested_by,
                 is4k=True,
                 session_cookie=session_cookie
@@ -2396,7 +2429,72 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ---------------------------------------------------------
-    # G) Fallback
+    # G) Seasons select
+    # ---------------------------------------------------------
+    elif data.startswith("sselect_"):
+        media_id = int(data.split("_")[2])
+        resolution_index = data.split("_")[1]
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if not selected_result:
+            logger.warning(f"Media ID {media_id} not found in search results.")
+            await query.edit_message_text("Unable to find this media. Please try again.")
+            return
+
+        session_cookie = None
+
+        if CURRENT_MODE == BotMode.NORMAL:
+            if "session_data" not in context.user_data:
+                await query.edit_message_text("Please log in first (/settings).")
+                return
+            session_cookie = context.user_data["session_data"]["cookie"]
+            if not check_session_validity(session_cookie):
+                await query.edit_message_text("⏳ Session expired, attempting to re-login...")
+                email, password = base64.b64decode(context.user_data["session_data"]["credentials"]).decode().split(":")
+                new_cookie = overseerr_login(email, password)
+                if new_cookie:
+                    context.user_data["session_data"]["cookie"] = new_cookie
+                    sessions = load_user_sessions()
+                    sessions[str(telegram_user_id)]["cookie"] = new_cookie
+                    save_user_sessions(sessions)
+                    await query.edit_message_text("✅ Successfully re-logged in!")
+                else:
+                    context.user_data.pop("session_data", None)
+                    await query.edit_message_text("❌ Re-login failed. Please log in again.")
+                    return
+        elif CURRENT_MODE == BotMode.SHARED:
+            shared_session = context.application.bot_data.get("shared_session")
+            if not shared_session or not check_session_validity(shared_session["cookie"]):
+                await query.edit_message_text("Shared session expired. Admin must re-login.")
+                return
+            session_cookie = shared_session["cookie"]
+
+        # Build request_buttons list
+        keyboard = []        
+        back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
+
+        if selected_result["mediaType"] == "tv":
+            jrespond = get_tv_details(media_id=media_id,session_cookie=session_cookie) 
+            for season in jrespond["seasons"]:
+                season_index = season.get("seasonNumber","")
+                btn_text = "📥 " + season.get("name","")
+                btn = InlineKeyboardButton(btn_text, callback_data=f"confirm_{resolution_index}_{selected_result['id']}_{season_index}")
+                keyboard.append([btn])
+        
+        btn_all = InlineKeyboardButton("📥 All", callback_data=f"confirm_{resolution_index}_{selected_result['id']}_all")
+        keyboard.append([btn_all])
+        keyboard.append([back_button])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_caption(
+        caption="Select seasons:",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+        )
+        # context.user_data["media_message_id"] = query.message.message_id
+        
+    # ---------------------------------------------------------
+    # H) Fallback
     # ---------------------------------------------------------
     logger.warning(f"User {telegram_user_id} triggered unknown callback data: {data}")
     await query.edit_message_text(
